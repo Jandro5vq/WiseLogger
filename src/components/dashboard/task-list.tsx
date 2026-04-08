@@ -122,7 +122,7 @@ function TaskGroup({
   const [expanded, setExpanded] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
 
-  const allTags = [...new Set(segments.flatMap((t) => t.tags))]
+  const allTags = Array.from(new Set(segments.flatMap((t) => t.tags)))
   const total = totalMs(segments)
   const spans = segments.length
 
