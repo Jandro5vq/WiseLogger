@@ -1,0 +1,264 @@
+'use client'
+
+import { useEffect, useState } from 'react'
+import Link from 'next/link'
+import { formatMinutes } from '@/lib/utils'
+import type { TaskWithTags } from '@/types/db'
+
+// Use local date to avoid UTC offset shifting the day
+function localDate(d: Date): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false)
+
+  function copy(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    navigator.clipboard.writeText(text).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    })
+  }
+
+  return (
+    <button
+      onClick={copy}
+      title="Copy description"
+      className="shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+    >
+      {copied ? (
+        <span className="text-[10px] text-green-600 dark:text-green-400 font-medium">✓</span>
+      ) : (
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/>
+        </svg>
+      )}
+    </button>
+  )
+}
+
+const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+
+interface DayData {
+  date: string
+  entry: { id: string; expectedMinutes: number; endTime: string | null } | null
+  tasks: TaskWithTags[]
+  workedMinutes: number
+  expectedMinutes: number
+  dayBalance: number
+}
+
+interface WeekData {
+  from: string
+  to: string
+  days: DayData[]
+  totalWorkedMinutes: number
+  totalExpectedMinutes: number
+  weekBalance: number
+}
+
+function fmtDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  return `${d.getDate()} ${d.toLocaleString('default', { month: 'short' })}`
+}
+
+function isToday(dateStr: string): boolean {
+  return dateStr === localDate(new Date())
+}
+
+// Group tasks by description, compute total per group
+function groupTasks(tasks: TaskWithTags[]): { description: string; tags: string[]; totalMinutes: number; sessions: number }[] {
+  const map = new Map<string, { tags: string[]; totalMs: number; sessions: number }>()
+  for (const t of tasks) {
+    if (!t.endTime) continue
+    const ms = new Date(t.endTime).getTime() - new Date(t.startTime).getTime()
+    const existing = map.get(t.description)
+    if (existing) {
+      existing.totalMs += ms
+      existing.sessions++
+    } else {
+      map.set(t.description, { tags: t.tags, totalMs: ms, sessions: 1 })
+    }
+  }
+  return Array.from(map.entries()).map(([description, v]) => ({
+    description,
+    tags: v.tags,
+    totalMinutes: v.totalMs / 60000,
+    sessions: v.sessions,
+  }))
+}
+
+function DayCard({ day, index }: { day: DayData; index: number }) {
+  const today = isToday(day.date)
+  const hasWork = day.workedMinutes > 0 || day.tasks.length > 0
+  const groups = groupTasks(day.tasks)
+  const progress = day.expectedMinutes > 0
+    ? Math.min((day.workedMinutes / day.expectedMinutes) * 100, 100)
+    : 0
+
+  return (
+    <div className={`rounded-xl border bg-card overflow-hidden flex flex-col ${today ? 'border-primary/50 ring-1 ring-primary/20' : 'border-border'}`}>
+      {/* day header */}
+      <Link
+        href={`/history/${day.date}`}
+        className="flex items-center justify-between px-4 py-3 border-b border-border/60 hover:bg-accent/50 transition-colors"
+      >
+        <div className="flex items-center gap-2">
+          <span className={`text-sm font-semibold ${today ? 'text-primary' : ''}`}>
+            {DAY_NAMES[index]}
+          </span>
+          <span className="text-xs text-muted-foreground">{fmtDate(day.date)}</span>
+          {today && <span className="text-[10px] bg-primary/10 text-primary rounded px-1.5 py-0.5 font-medium">Today</span>}
+        </div>
+        <div className="flex items-center gap-3 text-xs">
+          {hasWork ? (
+            <>
+              <span className="font-mono font-medium tabular-nums">{formatMinutes(day.workedMinutes)}</span>
+              <span className={`font-mono font-semibold tabular-nums ${day.dayBalance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+                {day.dayBalance >= 0 ? '+' : ''}{formatMinutes(day.dayBalance)}
+              </span>
+            </>
+          ) : (
+            <span className="text-muted-foreground/50 text-xs">no data</span>
+          )}
+          <span className="text-muted-foreground">→</span>
+        </div>
+      </Link>
+
+      {/* progress bar */}
+      {day.expectedMinutes > 0 && (
+        <div className="h-0.5 bg-muted">
+          <div
+            className={`h-0.5 transition-all ${day.dayBalance >= 0 ? 'bg-green-500' : 'bg-primary'}`}
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      )}
+
+      {/* task groups */}
+      <div className="flex-1 px-4 py-3 space-y-1.5">
+        {groups.length === 0 ? (
+          <p className="text-xs text-muted-foreground/50 text-center py-3">—</p>
+        ) : (
+          groups.map((g) => (
+            <div key={g.description} className="flex items-center justify-between gap-2 group/row">
+              <div className="flex items-center gap-1.5 min-w-0">
+                <span className="text-xs font-medium truncate" title={g.description}>{g.description}</span>
+                <CopyButton text={g.description} />
+                {g.sessions > 1 && (
+                  <span className="text-[10px] text-muted-foreground shrink-0">×{g.sessions}</span>
+                )}
+                {g.tags.map((tag) => (
+                  <span key={tag} className="text-[10px] bg-secondary rounded px-1 py-0.5 shrink-0">{tag}</span>
+                ))}
+              </div>
+              <span className="text-xs font-mono font-semibold tabular-nums text-muted-foreground shrink-0">
+                {formatMinutes(g.totalMinutes)}
+              </span>
+            </div>
+          ))
+        )}
+      </div>
+    </div>
+  )
+}
+
+function addWeeks(dateStr: string, n: number): string {
+  const d = new Date(dateStr + 'T00:00:00')
+  d.setDate(d.getDate() + n * 7)
+  return localDate(d)
+}
+
+export function WeekView() {
+  const [anchorDate, setAnchorDate] = useState(() => localDate(new Date()))
+  const [data, setData] = useState<WeekData | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    fetch(`/api/summary/week-tasks?date=${anchorDate}`)
+      .then((r) => r.json())
+      .then((d) => { setData(d); setLoading(false) })
+      .catch(() => setLoading(false))
+  }, [anchorDate])
+
+  function navigate(n: number) {
+    setAnchorDate((d) => addWeeks(d, n))
+  }
+
+  const isCurrentWeek = data
+    ? localDate(new Date()) >= data.from &&
+      localDate(new Date()) <= data.to
+    : false
+
+  return (
+    <div className="space-y-4">
+      {/* week navigation */}
+      <div className="flex items-center justify-between">
+        <button
+          onClick={() => navigate(-1)}
+          className="rounded-md p-2 hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
+        >
+          ←
+        </button>
+        <div className="text-center">
+          {data ? (
+            <div>
+              <p className="text-sm font-semibold">
+                {fmtDate(data.from)} – {fmtDate(data.to)}
+              </p>
+              {isCurrentWeek && <p className="text-xs text-primary font-medium">This week</p>}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">Loading…</p>
+          )}
+        </div>
+        <button
+          onClick={() => navigate(1)}
+          disabled={isCurrentWeek}
+          className="rounded-md p-2 hover:bg-accent transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
+        >
+          →
+        </button>
+      </div>
+
+      {/* week totals */}
+      {data && (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="rounded-lg border border-border bg-card px-4 py-3">
+            <p className="text-xs text-muted-foreground">Worked</p>
+            <p className="text-lg font-bold tabular-nums">{formatMinutes(data.totalWorkedMinutes)}</p>
+          </div>
+          <div className="rounded-lg border border-border bg-card px-4 py-3">
+            <p className="text-xs text-muted-foreground">Expected</p>
+            <p className="text-lg font-bold tabular-nums">{formatMinutes(data.totalExpectedMinutes)}</p>
+          </div>
+          <div className="rounded-lg border border-border bg-card px-4 py-3">
+            <p className="text-xs text-muted-foreground">Week balance</p>
+            <p className={`text-lg font-bold tabular-nums ${data.weekBalance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
+              {data.weekBalance >= 0 ? '+' : ''}{formatMinutes(data.weekBalance)}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* day cards */}
+      {loading && (
+        <div className="text-center py-12 text-muted-foreground text-sm">Loading…</div>
+      )}
+      {data && !loading && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
+          {data.days.map((day, i) => (
+            <DayCard key={day.date} day={day} index={i} />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

@@ -1,0 +1,22 @@
+services:
+  wiselogger:
+    build: .
+    image: wiselogger:latest
+    container_name: wiselogger
+    ports:
+      - "3000:3000"
+    volumes:
+      - wiselogger_data:/data
+    environment:
+      - SECRET_KEY=${SECRET_KEY}
+      - ADMIN_EMAIL=${ADMIN_EMAIL}
+      - BASE_URL=${BASE_URL:-http://localhost:3000}
+      - DB_PATH=/data/wiselogger.db
+      - PORT=3000
+      - INVITATION_EXPIRY_HOURS=${INVITATION_EXPIRY_HOURS:-72}
+      - BACKUP_CRON=${BACKUP_CRON:-0 2 * * *}
+      - BACKUP_PATH=/data/backups
+    restart: unless-stopped
+
+volumes:
+  wiselogger_data:

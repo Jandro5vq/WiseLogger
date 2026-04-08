@@ -1,0 +1,83 @@
+import { getSession } from '@/lib/auth/session'
+import { listTasksForEntry } from '@/lib/db/queries/tasks'
+import { computeEntryWorkedMinutes } from '@/lib/business/balance'
+import { autoCreateEntry, todayDateString } from '@/lib/business/tasks'
+import { getEntryBreaks, getTotalBreakMinutes } from '@/lib/db/queries/entry-breaks'
+import { parseTaskTags } from '@/types/db'
+import { TodayStats } from '@/components/dashboard/today-stats'
+import { ActiveTaskTimer } from '@/components/dashboard/active-task-timer'
+import { TaskList } from '@/components/dashboard/task-list'
+import { NewTaskForm } from '@/components/dashboard/new-task-form'
+import { CloseDayButton } from '@/components/dashboard/close-day-button'
+import { DayTimeline } from '@/components/dashboard/day-timeline'
+import { BreaksPanel } from '@/components/dashboard/breaks-panel'
+
+export const dynamic = 'force-dynamic'
+
+export default async function DashboardPage() {
+  const session = await getSession()
+  if (!session) return null
+
+  const today = todayDateString()
+
+  // Auto-create entry so we always have an entryId available
+  const entry = autoCreateEntry(session.user.id, today)
+  const rawTasks = listTasksForEntry(entry.id)
+  const tasks = rawTasks.map(parseTaskTags)
+  const workedMinutes = computeEntryWorkedMinutes(entry.id)
+  const breaks = getEntryBreaks(entry.id)
+  const totalBreakMinutes = getTotalBreakMinutes(entry.id)
+  const activeTask = tasks.find((t) => !t.endTime)
+  const completedTasks = tasks.filter((t) => t.endTime)
+  const isClosed = !!entry.endTime
+  const allTasksSorted = [...tasks].sort(
+    (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
+  )
+
+  return (
+    <div className="max-w-6xl mx-auto space-y-4">
+      <div className="flex items-center justify-between mb-2">
+        <h1 className="text-2xl font-bold">Today</h1>
+        <span className="text-sm text-muted-foreground">{today}</span>
+      </div>
+
+      <TodayStats
+        entryStartTime={entry.startTime ?? new Date().toISOString()}
+        completedWorkedMinutes={workedMinutes}
+        expectedMinutes={entry.expectedMinutes}
+        totalBreakMinutes={totalBreakMinutes}
+        activeTaskStartTime={activeTask?.startTime}
+      />
+
+      {activeTask && <ActiveTaskTimer task={activeTask} loadedDate={today} />}
+
+      <DayTimeline tasks={allTasksSorted} />
+
+      <BreaksPanel entryId={entry.id} initialBreaks={breaks} />
+
+      <div className="rounded-lg border border-border bg-card">
+        <div className="border-b border-border px-4 py-3">
+          <h2 className="text-sm font-medium">Tasks</h2>
+        </div>
+        <div className="p-4 space-y-3">
+          <TaskList
+            tasks={completedTasks}
+            entryId={entry.id}
+            activeTaskId={activeTask?.id}
+          />
+          {!isClosed && (
+            <NewTaskForm entryId={entry.id} activeTaskId={activeTask?.id} />
+          )}
+        </div>
+      </div>
+
+      {!isClosed ? (
+        <CloseDayButton disabled={!!activeTask} />
+      ) : (
+        <div className="rounded-lg border border-border bg-muted/30 px-4 py-3 text-sm text-muted-foreground text-center">
+          Shift closed for today
+        </div>
+      )}
+    </div>
+  )
+}
