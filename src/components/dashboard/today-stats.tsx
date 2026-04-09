@@ -37,8 +37,6 @@ export function TodayStats({
     ? new Date(firstTaskStartTime).getTime()
     : new Date(entryStartTime).getTime()
   const expectedEndMs = refMs + (expectedMinutes + totalBreakMinutes) * 60_000
-  const remainingMs   = expectedEndMs - now          // negative = overtime
-  const isOvertime    = remainingMs <= 0
 
   // ── task time (live, ticks with active task) — raw durations, no break deduction ──
   const activeMs = activeTaskStartTime
@@ -50,6 +48,17 @@ export function TodayStats({
   const progress   = expectedMinutes > 0
     ? Math.min((liveTaskMinutes / expectedMinutes) * 100, 100)
     : 0
+
+  // Overtime logic:
+  // - Active task present → clock-based (did we pass the expected end time?)
+  // - No active task → task-balance-based (did we log more minutes than expected?)
+  // This prevents showing stale "extra" time when the user finished hours ago.
+  const isOvertime = activeTaskStartTime
+    ? now >= expectedEndMs
+    : dayBalance > 0
+  const overtimeMinutes = activeTaskStartTime
+    ? (now - expectedEndMs) / 60_000
+    : dayBalance
 
   return (
     <div className="grid grid-cols-2 gap-4 mb-6">
@@ -72,7 +81,7 @@ export function TodayStats({
         <p className="text-2xl font-bold mt-1 tabular-nums">{fmtHHMM(expectedEndMs)}</p>
         {isOvertime && (
           <p className="text-xs text-green-600 dark:text-green-400 mt-1 font-medium tabular-nums">
-            +{formatMinutes(Math.abs(remainingMs) / 60_000)} extra
+            +{formatMinutes(overtimeMinutes)} extra
           </p>
         )}
       </div>
