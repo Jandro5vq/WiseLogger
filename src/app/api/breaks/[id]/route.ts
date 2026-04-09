@@ -4,6 +4,8 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { getEntryBreakById, updateEntryBreak, deleteEntryBreak } from '@/lib/db/queries/entry-breaks'
+import { getEntryById } from '@/lib/db/queries/entries'
+import { buildEntryIntervals, detectOverlap, breakToInterval } from '@/lib/business/breaks'
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession(req)
@@ -15,6 +17,22 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const body = await req.json()
+  const newBreakStart = body.breakStart ?? b.breakStart
+  const newDuration = body.durationMinutes ?? b.durationMinutes
+
+  // Validate overlap against other intervals (excluding this break)
+  const entry = getEntryById(b.entryId)
+  if (entry) {
+    const { startIso, endIso } = breakToInterval({ breakStart: newBreakStart, durationMinutes: newDuration }, entry.date)
+    const existing = buildEntryIntervals(b.entryId, entry.date, { excludeBreakId: b.id })
+    if (detectOverlap(existing, { start: new Date(startIso).getTime(), end: new Date(endIso).getTime() })) {
+      return NextResponse.json(
+        { error: 'La pausa se solapa con una tarea o pausa existente' },
+        { status: 400 }
+      )
+    }
+  }
+
   const updated = updateEntryBreak(params.id, body)
   return NextResponse.json(updated)
 }

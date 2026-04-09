@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { getSession } from '@/lib/auth/session'
 import { getEntryById } from '@/lib/db/queries/entries'
 import { getEntryBreaks, createEntryBreak } from '@/lib/db/queries/entry-breaks'
+import { buildEntryIntervals, detectOverlap, breakToInterval } from '@/lib/business/breaks'
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession(_req)
@@ -32,7 +33,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const { breakStart, durationMinutes, label } = body
 
   if (!breakStart || durationMinutes == null) {
-    return NextResponse.json({ error: 'breakStart and durationMinutes are required' }, { status: 400 })
+    return NextResponse.json({ error: 'breakStart y durationMinutes son obligatorios' }, { status: 400 })
+  }
+
+  // Validate overlap
+  const { startIso, endIso } = breakToInterval({ breakStart, durationMinutes }, entry.date)
+  const existing = buildEntryIntervals(params.id, entry.date)
+  if (detectOverlap(existing, { start: new Date(startIso).getTime(), end: new Date(endIso).getTime() })) {
+    return NextResponse.json(
+      { error: 'La pausa se solapa con una tarea o pausa existente' },
+      { status: 400 }
+    )
   }
 
   const b = createEntryBreak({

@@ -1,5 +1,7 @@
-import { listEntries } from '@/lib/db/queries/entries'
+import { listEntries, getEntryById } from '@/lib/db/queries/entries'
 import { listTasksForEntry } from '@/lib/db/queries/tasks'
+import { getEntryBreaks } from '@/lib/db/queries/entry-breaks'
+import { breakToInterval } from '@/lib/business/breaks'
 
 export interface DaySummary {
   date: string
@@ -15,9 +17,23 @@ export interface BalanceResult {
   cumulativeBalance: number
 }
 
-function taskDurationMinutes(startTime: string, endTime: string): number {
-  const ms = new Date(endTime).getTime() - new Date(startTime).getTime()
-  return ms / 60000
+/** Net task duration minus any overlapping break time, in minutes. */
+function netTaskMinutes(
+  startTime: string,
+  endTime: string,
+  breakIntervals: Array<{ startIso: string; endIso: string }>
+): number {
+  const taskStart = new Date(startTime).getTime()
+  const taskEnd = new Date(endTime).getTime()
+  const taskMs = taskEnd - taskStart
+
+  const overlapMs = breakIntervals.reduce((ov, bi) => {
+    const oStart = Math.max(taskStart, new Date(bi.startIso).getTime())
+    const oEnd = Math.min(taskEnd, new Date(bi.endIso).getTime())
+    return ov + Math.max(0, oEnd - oStart)
+  }, 0)
+
+  return Math.max(0, taskMs - overlapMs) / 60_000
 }
 
 /**
@@ -34,9 +50,12 @@ export function computeBalance(userId: string, upToDate?: string): BalanceResult
 
   for (const entry of allEntries) {
     const entryTasks = listTasksForEntry(entry.id)
+    const entryBreaks = getEntryBreaks(entry.id)
+    const breakIntervals = entryBreaks.map((b) => breakToInterval(b, entry.date))
+
     const workedMinutes = entryTasks
       .filter((t) => t.startTime && t.endTime)
-      .reduce((sum, t) => sum + taskDurationMinutes(t.startTime, t.endTime!), 0)
+      .reduce((sum, t) => sum + netTaskMinutes(t.startTime, t.endTime!, breakIntervals), 0)
 
     const dayBalance = workedMinutes - entry.expectedMinutes
     totalWorked += workedMinutes
@@ -59,11 +78,17 @@ export function computeBalance(userId: string, upToDate?: string): BalanceResult
 }
 
 /**
- * Computes worked minutes for a single entry's tasks.
+ * Computes net worked minutes for a single entry's tasks (breaks subtracted).
  */
 export function computeEntryWorkedMinutes(entryId: string): number {
+  const entry = getEntryById(entryId)
+  if (!entry) return 0
+
   const entryTasks = listTasksForEntry(entryId)
+  const entryBreaks = getEntryBreaks(entryId)
+  const breakIntervals = entryBreaks.map((b) => breakToInterval(b, entry.date))
+
   return entryTasks
     .filter((t) => t.startTime && t.endTime)
-    .reduce((sum, t) => sum + taskDurationMinutes(t.startTime, t.endTime!), 0)
+    .reduce((sum, t) => sum + netTaskMinutes(t.startTime, t.endTime!, breakIntervals), 0)
 }
