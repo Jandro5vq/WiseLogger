@@ -1,6 +1,5 @@
 import { getSession } from '@/lib/auth/session'
 import { listTasksForEntry } from '@/lib/db/queries/tasks'
-import { computeEntryWorkedMinutes } from '@/lib/business/balance'
 import { autoCreateEntry, todayDateString } from '@/lib/business/tasks'
 import { getEntryBreaks, getTotalBreakMinutes } from '@/lib/db/queries/entry-breaks'
 import { parseTaskTags } from '@/types/db'
@@ -36,7 +35,11 @@ export default async function DashboardPage() {
   const entry = autoCreateEntry(session.user.id, today)
   const rawTasks = listTasksForEntry(entry.id)
   const tasks = rawTasks.map(parseTaskTags)
-  const workedMinutes = computeEntryWorkedMinutes(entry.id)
+  // Raw task durations (no break subtraction) for the "Tiempo en tareas" display.
+  // Matches how the active-task live ticker works (now − startTime, no break deduction).
+  const rawCompletedMinutes = tasks
+    .filter((t) => t.endTime)
+    .reduce((sum, t) => sum + (new Date(t.endTime!).getTime() - new Date(t.startTime).getTime()) / 60_000, 0)
   const breaks = getEntryBreaks(entry.id)
   const totalBreakMinutes = getTotalBreakMinutes(entry.id)
   const activeTask = tasks.find((t) => !t.endTime)
@@ -81,7 +84,7 @@ export default async function DashboardPage() {
       <TodayStats
         entryStartTime={entryStartTime}
         firstTaskStartTime={firstTaskStartTime}
-        completedWorkedMinutes={workedMinutes}
+        completedTaskMinutes={rawCompletedMinutes}
         expectedMinutes={entry.expectedMinutes}
         totalBreakMinutes={totalBreakMinutes}
         activeTaskStartTime={activeTask?.startTime}

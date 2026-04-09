@@ -6,7 +6,7 @@ import { formatMinutes } from '@/lib/utils'
 interface TodayStatsProps {
   entryStartTime: string           // fallback if no tasks yet
   firstTaskStartTime?: string      // drives the expectedEnd reference
-  completedWorkedMinutes: number   // sum of finished tasks, breaks already subtracted (server value)
+  completedTaskMinutes: number     // raw sum of finished task durations (no break subtraction)
   expectedMinutes: number
   totalBreakMinutes: number        // sum of today's breaks (shifts expectedEnd)
   activeTaskStartTime?: string     // ISO — for live "worked" ticking
@@ -20,7 +20,7 @@ function fmtHHMM(ms: number): string {
 export function TodayStats({
   entryStartTime,
   firstTaskStartTime,
-  completedWorkedMinutes,
+  completedTaskMinutes,
   expectedMinutes,
   totalBreakMinutes,
   activeTaskStartTime,
@@ -40,23 +40,23 @@ export function TodayStats({
   const remainingMs   = expectedEndMs - now          // negative = overtime
   const isOvertime    = remainingMs <= 0
 
-  // ── worked (live, ticks with active task) ─────────────────────────────────
+  // ── task time (live, ticks with active task) — raw durations, no break deduction ──
   const activeMs = activeTaskStartTime
     ? Math.max(0, now - new Date(activeTaskStartTime).getTime())
     : 0
-  const liveWorkedMinutes = completedWorkedMinutes + activeMs / 60_000
+  const liveTaskMinutes = completedTaskMinutes + activeMs / 60_000
 
-  const dayBalance = liveWorkedMinutes - expectedMinutes
+  const dayBalance = liveTaskMinutes - expectedMinutes
   const progress   = expectedMinutes > 0
-    ? Math.min((liveWorkedMinutes / expectedMinutes) * 100, 100)
+    ? Math.min((liveTaskMinutes / expectedMinutes) * 100, 100)
     : 0
 
   return (
     <div className="grid grid-cols-2 gap-4 mb-6">
-      {/* worked today */}
+      {/* task time */}
       <div className="rounded-lg border border-border bg-card p-4">
-        <p className="text-xs text-muted-foreground uppercase tracking-wide">Trabajado hoy</p>
-        <p className="text-2xl font-bold mt-1 tabular-nums">{formatMinutes(liveWorkedMinutes)}</p>
+        <p className="text-xs text-muted-foreground uppercase tracking-wide">Tiempo en tareas</p>
+        <p className="text-2xl font-bold mt-1 tabular-nums">{formatMinutes(liveTaskMinutes)}</p>
         <div className="mt-2 h-1.5 rounded-full bg-muted overflow-hidden">
           <div
             className={`h-1.5 rounded-full transition-all ${dayBalance >= 0 ? 'bg-green-500' : 'bg-primary'}`}
