@@ -34,10 +34,26 @@ const PALETTE = [
 const ROW_H   = 32  // px height per swimlane row
 const AXIS_H  = 20  // px height for time labels below chart
 const TICKS   = 5   // number of time-axis ticks
+const BREAK_COLOR = '#64748b' // slate-500
+
+// ─── types ───────────────────────────────────────────────────────────────────
+
+interface BreakRecord {
+  id: string
+  breakStart: string   // HH:MM
+  durationMinutes: number
+  label: string | null
+}
+
+interface DayTimelineProps {
+  tasks: TaskWithTags[]
+  breaks?: BreakRecord[]
+  entryDate?: string     // YYYY-MM-DD — needed to resolve break ISO times
+}
 
 // ─── component ───────────────────────────────────────────────────────────────
 
-export function DayTimeline({ tasks }: { tasks: TaskWithTags[] }) {
+export function DayTimeline({ tasks, breaks = [], entryDate }: DayTimelineProps) {
   const [now, setNow] = useState(() => Date.now())
   const hasActive = tasks.some((t) => !t.endTime)
 
@@ -47,17 +63,41 @@ export function DayTimeline({ tasks }: { tasks: TaskWithTags[] }) {
     return () => clearInterval(id)
   }, [hasActive])
 
-  if (tasks.length === 0) return null
+  if (tasks.length === 0 && breaks.length === 0) return null
+
+  const hasBreaks = breaks.length > 0 && !!entryDate
+
+  // Compute break intervals as ms epoch
+  const breakIntervals = hasBreaks
+    ? breaks.map((b) => {
+        const startMs = new Date(`${entryDate}T${b.breakStart}:00`).getTime()
+        const endMs = startMs + b.durationMinutes * 60_000
+        return { id: b.id, startMs, endMs, label: b.label, durationMinutes: b.durationMinutes }
+      })
+    : []
 
   const segments = [...tasks].sort(
     (a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime()
   )
 
-  const spanStart = new Date(segments[0].startTime).getTime()
-  const spanEnd = hasActive
-    ? now
-    : Math.max(...segments.map((t) => new Date(t.endTime!).getTime()))
-  const totalSpan = Math.max(spanEnd - spanStart, 1)
+  if (segments.length === 0 && !hasBreaks) return null
+
+  // Determine overall span
+  const allStarts = [
+    ...segments.map((t) => new Date(t.startTime).getTime()),
+    ...breakIntervals.map((b) => b.startMs),
+  ]
+  const allEnds = [
+    ...segments.filter((t) => t.endTime).map((t) => new Date(t.endTime!).getTime()),
+    ...breakIntervals.map((b) => b.endMs),
+    ...(hasActive ? [now] : []),
+  ]
+
+  if (allStarts.length === 0) return null
+
+  const spanStart = Math.min(...allStarts)
+  const spanEnd   = Math.max(...allEnds, spanStart + 1)
+  const totalSpan = spanEnd - spanStart
 
   // stable color & row order — first-seen
   const colorIdx = new Map<string, number>()
@@ -69,6 +109,9 @@ export function DayTimeline({ tasks }: { tasks: TaskWithTags[] }) {
       rows.push(t.description)
     }
   }
+  // Breaks row appended at the end (if any)
+  const breaksRowLabel = 'Pausas'
+  if (hasBreaks) rows.push(breaksRowLabel)
 
   // total duration per description
   const totals = new Map<string, number>()
@@ -107,7 +150,8 @@ export function DayTimeline({ tasks }: { tasks: TaskWithTags[] }) {
           {/* label column */}
           <div className="shrink-0 flex flex-col" style={{ width: 110, height: chartH }}>
             {rows.map((desc) => {
-              const p = PALETTE[colorIdx.get(desc) ?? 0]
+              const isBreaksRow = desc === breaksRowLabel
+              const color = isBreaksRow ? BREAK_COLOR : PALETTE[colorIdx.get(desc) ?? 0].hex
               return (
                 <div
                   key={desc}
@@ -116,10 +160,10 @@ export function DayTimeline({ tasks }: { tasks: TaskWithTags[] }) {
                 >
                   <span
                     className="shrink-0 w-2.5 h-2.5 rounded-sm"
-                    style={{ backgroundColor: p.hex }}
+                    style={{ backgroundColor: color }}
                   />
                   <span
-                    className="text-xs font-medium truncate text-foreground/80"
+                    className={`text-xs font-medium truncate ${isBreaksRow ? 'text-muted-foreground' : 'text-foreground/80'}`}
                     title={desc}
                     style={{ maxWidth: 88 }}
                   >
@@ -152,7 +196,7 @@ export function DayTimeline({ tasks }: { tasks: TaskWithTags[] }) {
                 />
               ))}
 
-              {/* bars */}
+              {/* task bars */}
               {segments.map((task) => {
                 const rowI     = rows.indexOf(task.description)
                 const tStart   = new Date(task.startTime).getTime()
@@ -193,6 +237,36 @@ export function DayTimeline({ tasks }: { tasks: TaskWithTags[] }) {
                   </div>
                 )
               })}
+
+              {/* break bars */}
+              {hasBreaks && breakIntervals.map((bi) => {
+                const rowI  = rows.indexOf(breaksRowLabel)
+                const left  = pct(bi.startMs)
+                const width = Math.max(pct(bi.endMs) - pct(bi.startMs), 0.3)
+                const label = bi.label ?? `${bi.durationMinutes}m`
+
+                return (
+                  <div
+                    key={bi.id}
+                    title={`Pausa: ${fmtHHMM(bi.startMs)} → ${fmtHHMM(bi.endMs)}  (${bi.durationMinutes}m)${bi.label ? `\n${bi.label}` : ''}`}
+                    className="absolute rounded flex items-center overflow-hidden cursor-default select-none"
+                    style={{
+                      left:   `${left}%`,
+                      width:  `${width}%`,
+                      top:    rowI * ROW_H + 5,
+                      height: ROW_H - 10,
+                      backgroundColor: BREAK_COLOR,
+                      opacity: 0.65,
+                    }}
+                  >
+                    {width > 5 && (
+                      <span className="text-white text-[10px] font-semibold px-1.5 truncate leading-none drop-shadow-sm">
+                        {label}
+                      </span>
+                    )}
+                  </div>
+                )
+              })}
             </div>
 
             {/* time axis */}
@@ -212,7 +286,7 @@ export function DayTimeline({ tasks }: { tasks: TaskWithTags[] }) {
 
         {/* ── totals legend ── */}
         <div className="flex flex-wrap gap-x-5 gap-y-1.5 pt-2 border-t border-border/40">
-          {rows.map((desc) => {
+          {rows.filter((r) => r !== breaksRowLabel).map((desc) => {
             const p     = PALETTE[colorIdx.get(desc) ?? 0]
             const total = totals.get(desc) ?? 0
             const live  = tasks.some((t) => t.description === desc && !t.endTime)

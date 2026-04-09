@@ -5,10 +5,10 @@ import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
 
 const navItems = [
-  { href: '/dashboard', label: 'Today', icon: '⏱️' },
-  { href: '/history', label: 'History', icon: '📅' },
-  { href: '/stats', label: 'Stats', icon: '📊' },
-  { href: '/settings', label: 'Settings', icon: '⚙️' },
+  { href: '/dashboard', label: 'Hoy', icon: '⏱️' },
+  { href: '/history', label: 'Historial', icon: '📅' },
+  { href: '/stats', label: 'Estadísticas', icon: '📊' },
+  { href: '/settings', label: 'Ajustes', icon: '⚙️' },
 ]
 
 export function Sidebar({ isAdmin }: { isAdmin: boolean }) {
@@ -64,7 +64,7 @@ export function Sidebar({ isAdmin }: { isAdmin: boolean }) {
         className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
       >
         <span>🚪</span>
-        Sign out
+        Cerrar sesión
       </button>
     </aside>
   )

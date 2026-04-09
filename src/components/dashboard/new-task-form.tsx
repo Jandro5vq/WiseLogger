@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { isoToLocalInput } from '@/lib/utils'
+import { DateTimeInput } from '@/components/ui/date-time-input'
 
 interface Favorite {
   description: string
@@ -13,9 +14,11 @@ interface Favorite {
 interface NewTaskFormProps {
   entryId: string
   activeTaskId?: string // if set, it will be stopped first
+  /** ISO string — if provided, the new-task form opens with this as the default start time */
+  defaultStartTime?: string
 }
 
-export function NewTaskForm({ entryId, activeTaskId }: NewTaskFormProps) {
+export function NewTaskForm({ entryId, activeTaskId, defaultStartTime }: NewTaskFormProps) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
   const [description, setDescription] = useState('')
@@ -41,7 +44,7 @@ export function NewTaskForm({ entryId, activeTaskId }: NewTaskFormProps) {
   }, [])
 
   function openForm() {
-    setStartTime(isoToLocalInput(new Date().toISOString()))
+    setStartTime(isoToLocalInput(defaultStartTime ?? new Date().toISOString()))
     setOpen(true)
   }
 
@@ -95,7 +98,7 @@ export function NewTaskForm({ entryId, activeTaskId }: NewTaskFormProps) {
         onClick={openForm}
         className="w-full rounded-lg border-2 border-dashed border-border hover:border-primary/50 py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
-        + New task <span className="text-xs opacity-60">(N)</span>
+        + Nueva tarea <span className="text-xs opacity-60">(N)</span>
       </button>
     )
   }
@@ -105,7 +108,7 @@ export function NewTaskForm({ entryId, activeTaskId }: NewTaskFormProps) {
       <div className="relative">
         <input
           type="text"
-          placeholder="Task description"
+          placeholder="Descripción de la tarea"
           required
           autoFocus
           value={description}
@@ -135,7 +138,7 @@ export function NewTaskForm({ entryId, activeTaskId }: NewTaskFormProps) {
 
       <input
         type="text"
-        placeholder="Tags (comma-separated)"
+        placeholder="Etiquetas (separadas por coma)"
         value={tagsInput}
         onChange={(e) => setTagsInput(e.target.value)}
         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
@@ -143,28 +146,18 @@ export function NewTaskForm({ entryId, activeTaskId }: NewTaskFormProps) {
 
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="block text-xs text-muted-foreground mb-1">Start time</label>
-          <input
-            type="datetime-local"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          />
+          <label className="block text-xs text-muted-foreground mb-1">Hora de inicio</label>
+          <DateTimeInput value={startTime} onChange={setStartTime} />
         </div>
         <div>
-          <label className="block text-xs text-muted-foreground mb-1">End time <span className="opacity-50">(optional)</span></label>
-          <input
-            type="datetime-local"
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-            className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-          />
+          <label className="block text-xs text-muted-foreground mb-1">Hora de fin <span className="opacity-50">(opcional)</span></label>
+          <DateTimeInput value={endTime} onChange={setEndTime} />
         </div>
       </div>
 
       {activeTaskId && (
         <p className="text-xs text-amber-600 dark:text-amber-400">
-          The active task will be stopped when you start this one.
+          La tarea activa se detendrá al iniciar esta.
         </p>
       )}
 
@@ -176,14 +169,14 @@ export function NewTaskForm({ entryId, activeTaskId }: NewTaskFormProps) {
           disabled={loading}
           className="flex-1 rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
-          {loading ? 'Saving…' : endTime ? 'Add task' : 'Start task'}
+          {loading ? 'Guardando…' : endTime ? 'Añadir tarea' : 'Iniciar tarea'}
         </button>
         <button
           type="button"
           onClick={() => { setOpen(false); setError('') }}
           className="rounded-md border border-border px-3 py-2 text-sm hover:bg-accent transition-colors"
         >
-          Cancel
+          Cancelar
         </button>
       </div>
     </form>

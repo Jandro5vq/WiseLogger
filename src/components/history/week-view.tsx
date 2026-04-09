@@ -28,7 +28,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={copy}
-      title="Copy description"
+      title="Copiar descripción"
       className="shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
     >
       {copied ? (
@@ -42,8 +42,7 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
-const DAY_NAMES = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
-const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const DAY_NAMES = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
 
 interface DayData {
   date: string
@@ -65,7 +64,8 @@ interface WeekData {
 
 function fmtDate(dateStr: string): string {
   const d = new Date(dateStr + 'T00:00:00')
-  return `${d.getDate()} ${d.toLocaleString('default', { month: 'short' })}`
+  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+  return `${d.getDate()} ${months[d.getMonth()]}`
 }
 
 function isToday(dateStr: string): boolean {
@@ -114,7 +114,7 @@ function DayCard({ day, index }: { day: DayData; index: number }) {
             {DAY_NAMES[index]}
           </span>
           <span className="text-xs text-muted-foreground">{fmtDate(day.date)}</span>
-          {today && <span className="text-[10px] bg-primary/10 text-primary rounded px-1.5 py-0.5 font-medium">Today</span>}
+          {today && <span className="text-[10px] bg-primary/10 text-primary rounded px-1.5 py-0.5 font-medium">Hoy</span>}
         </div>
         <div className="flex items-center gap-3 text-xs">
           {hasWork ? (
@@ -125,7 +125,7 @@ function DayCard({ day, index }: { day: DayData; index: number }) {
               </span>
             </>
           ) : (
-            <span className="text-muted-foreground/50 text-xs">no data</span>
+            <span className="text-muted-foreground/50 text-xs">sin datos</span>
           )}
           <span className="text-muted-foreground">→</span>
         </div>
@@ -175,10 +175,16 @@ function addWeeks(dateStr: string, n: number): string {
   return localDate(d)
 }
 
+const WEEKEND_KEY = 'wl:showWeekends'
+
 export function WeekView() {
   const [anchorDate, setAnchorDate] = useState(() => localDate(new Date()))
   const [data, setData] = useState<WeekData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [showWeekends, setShowWeekends] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem(WEEKEND_KEY) === 'true'
+  })
 
   useEffect(() => {
     setLoading(true)
@@ -192,10 +198,23 @@ export function WeekView() {
     setAnchorDate((d) => addWeeks(d, n))
   }
 
+  function toggleWeekends() {
+    setShowWeekends((v) => {
+      const next = !v
+      localStorage.setItem(WEEKEND_KEY, String(next))
+      return next
+    })
+  }
+
   const isCurrentWeek = data
     ? localDate(new Date()) >= data.from &&
       localDate(new Date()) <= data.to
     : false
+
+  // Filter days: Mon-Fri (index 0-4) unless showWeekends
+  const visibleDays = data
+    ? data.days.filter((_, i) => showWeekends || i < 5)
+    : []
 
   return (
     <div className="space-y-4">
@@ -213,10 +232,10 @@ export function WeekView() {
               <p className="text-sm font-semibold">
                 {fmtDate(data.from)} – {fmtDate(data.to)}
               </p>
-              {isCurrentWeek && <p className="text-xs text-primary font-medium">This week</p>}
+              {isCurrentWeek && <p className="text-xs text-primary font-medium">Esta semana</p>}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">Loading…</p>
+            <p className="text-sm text-muted-foreground">Cargando…</p>
           )}
         </div>
         <button
@@ -228,33 +247,13 @@ export function WeekView() {
         </button>
       </div>
 
-      {/* week totals */}
-      {data && (
-        <div className="grid grid-cols-3 gap-3">
-          <div className="rounded-lg border border-border bg-card px-4 py-3">
-            <p className="text-xs text-muted-foreground">Worked</p>
-            <p className="text-lg font-bold tabular-nums">{formatMinutes(data.totalWorkedMinutes)}</p>
-          </div>
-          <div className="rounded-lg border border-border bg-card px-4 py-3">
-            <p className="text-xs text-muted-foreground">Expected</p>
-            <p className="text-lg font-bold tabular-nums">{formatMinutes(data.totalExpectedMinutes)}</p>
-          </div>
-          <div className="rounded-lg border border-border bg-card px-4 py-3">
-            <p className="text-xs text-muted-foreground">Week balance</p>
-            <p className={`text-lg font-bold tabular-nums ${data.weekBalance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-500 dark:text-red-400'}`}>
-              {data.weekBalance >= 0 ? '+' : ''}{formatMinutes(data.weekBalance)}
-            </p>
-          </div>
-        </div>
-      )}
-
-      {/* day cards */}
+      {/* day cards — vertical column */}
       {loading && (
-        <div className="text-center py-12 text-muted-foreground text-sm">Loading…</div>
+        <div className="text-center py-12 text-muted-foreground text-sm">Cargando…</div>
       )}
       {data && !loading && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3">
-          {data.days.map((day, i) => (
+        <div className="flex flex-col gap-3 max-w-3xl mx-auto">
+          {visibleDays.map((day, i) => (
             <DayCard key={day.date} day={day} index={i} />
           ))}
         </div>

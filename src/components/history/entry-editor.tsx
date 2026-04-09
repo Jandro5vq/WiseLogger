@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { formatMinutes, isoToLocalInput } from '@/lib/utils'
 import type { Entry, TaskWithTags } from '@/types/db'
 import { TaskList } from '@/components/dashboard/task-list'
+import { DateTimeInput } from '@/components/ui/date-time-input'
 
 interface EntryEditorProps {
   date: string
@@ -52,7 +53,7 @@ function AddTaskForm({ entryId, onAdded }: { entryId: string; onAdded: () => voi
     <form onSubmit={save} className="rounded-lg border border-primary/30 bg-card p-3 space-y-2">
       <input
         type="text"
-        placeholder="Task description"
+        placeholder="Descripción de la tarea"
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         required
@@ -61,30 +62,19 @@ function AddTaskForm({ entryId, onAdded }: { entryId: string; onAdded: () => voi
       />
       <input
         type="text"
-        placeholder="Tags (comma-separated)"
+        placeholder="Etiquetas (separadas por coma)"
         value={tagsInput}
         onChange={(e) => setTagsInput(e.target.value)}
         className="w-full rounded border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
       />
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="text-xs text-muted-foreground">Start</label>
-          <input
-            type="datetime-local"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-            required
-            className="w-full rounded border border-input bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
-          />
+          <label className="text-xs text-muted-foreground">Inicio</label>
+          <DateTimeInput value={startTime} onChange={setStartTime} required />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground">End <span className="opacity-50">(optional)</span></label>
-          <input
-            type="datetime-local"
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-            className="w-full rounded border border-input bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
-          />
+          <label className="text-xs text-muted-foreground">Fin <span className="opacity-50">(opcional)</span></label>
+          <DateTimeInput value={endTime} onChange={setEndTime} />
         </div>
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
@@ -93,7 +83,7 @@ function AddTaskForm({ entryId, onAdded }: { entryId: string; onAdded: () => voi
         disabled={saving}
         className="rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
       >
-        {saving ? 'Adding…' : 'Add task'}
+        {saving ? 'Añadiendo…' : 'Añadir tarea'}
       </button>
     </form>
   )
@@ -129,7 +119,7 @@ export function EntryEditor({ date, entry, tasks }: EntryEditorProps) {
   if (!entry) {
     return (
       <div className="rounded-lg border border-border bg-card p-6 text-center text-muted-foreground">
-        No shift recorded for this day.
+        Sin jornada registrada para este día.
       </div>
     )
   }
@@ -140,11 +130,12 @@ export function EntryEditor({ date, entry, tasks }: EntryEditorProps) {
     <div className="space-y-4">
       <div className="grid grid-cols-2 gap-4">
         <div className="rounded-lg border border-border bg-card p-4">
-          <p className="text-xs text-muted-foreground">Worked</p>
+          <p className="text-xs text-muted-foreground">Trabajado</p>
           <p className="text-xl font-bold">{formatMinutes(workedMinutes)}</p>
         </div>
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-xs text-muted-foreground">Balance</p>
+
           <p className={`text-xl font-bold ${dayBalance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
             {dayBalance >= 0 ? '+' : ''}{formatMinutes(dayBalance)}
           </p>
@@ -153,12 +144,12 @@ export function EntryEditor({ date, entry, tasks }: EntryEditorProps) {
 
       <div className="rounded-lg border border-border bg-card">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
-          <h2 className="text-sm font-medium">Tasks</h2>
+          <h2 className="text-sm font-medium">Tareas</h2>
           <button
             onClick={() => setShowAdd((v) => !v)}
             className="text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
-            {showAdd ? 'Cancel' : '+ Add task'}
+            {showAdd ? 'Cancelar' : '+ Añadir tarea'}
           </button>
         </div>
         <div className="p-4 space-y-3">
@@ -173,20 +164,20 @@ export function EntryEditor({ date, entry, tasks }: EntryEditorProps) {
       </div>
 
       <div className="rounded-lg border border-border bg-card p-4">
-        <h2 className="text-sm font-medium mb-2">Notes</h2>
+        <h2 className="text-sm font-medium mb-2">Notas</h2>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}
           rows={3}
           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
-          placeholder="Add notes for this day…"
+          placeholder="Notas del día…"
         />
         <button
           onClick={saveNotes}
           disabled={saving}
           className="mt-2 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
-          {saving ? 'Saving…' : 'Save notes'}
+          {saving ? 'Guardando…' : 'Guardar notas'}
         </button>
       </div>
     </div>

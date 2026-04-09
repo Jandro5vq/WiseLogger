@@ -44,7 +44,7 @@ export function ActiveTaskTimer({ task, loadedDate }: ActiveTaskTimerProps) {
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             <span className="animate-pulse w-2 h-2 rounded-full bg-green-500 shrink-0" />
-            <span className="text-sm font-medium">Active task</span>
+            <span className="text-sm font-medium">Tarea activa</span>
           </div>
           <p className="text-base font-semibold mt-1 truncate" title={task.description}>{task.description}</p>
           {task.tags.length > 0 && (
@@ -62,7 +62,7 @@ export function ActiveTaskTimer({ task, loadedDate }: ActiveTaskTimerProps) {
             disabled={stopping}
             className="mt-2 rounded bg-destructive px-3 py-1 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
           >
-            {stopping ? 'Stopping…' : 'Stop (S)'}
+            {stopping ? 'Deteniendo…' : 'Detener (S)'}
           </button>
         </div>
       </div>

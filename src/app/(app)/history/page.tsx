@@ -25,7 +25,7 @@ export default function HistoryPage() {
   return (
     <div className="max-w-7xl mx-auto">
       <div className="flex items-center justify-between mb-6">
-        <h1 className="text-2xl font-bold">History</h1>
+        <h1 className="text-2xl font-bold">Historial</h1>
         <div className="flex rounded-md border border-border overflow-hidden">
           {(['week', 'month'] as View[]).map((v) => (
             <button
@@ -37,7 +37,7 @@ export default function HistoryPage() {
                   : 'text-muted-foreground hover:bg-accent'
               }`}
             >
-              {v}
+              {v === 'week' ? 'Semana' : 'Mes'}
             </button>
           ))}
         </div>

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { formatMinutes } from '@/lib/utils'
+import { TimeInput } from '@/components/ui/time-input'
 
 // ─── Break rules ─────────────────────────────────────────────────────────────
 
@@ -17,8 +18,8 @@ interface BreakRule {
 
 function breakRuleLabel(rule: BreakRule): string {
   if (rule.label) return rule.label
-  if (rule.ruleType === 'always') return 'Every day'
-  if (rule.ruleType === 'schedule_duration') return `On ${formatMinutes(rule.scheduleDuration ?? 0)} days`
+  if (rule.ruleType === 'always') return 'Todos los días'
+  if (rule.ruleType === 'schedule_duration') return `En jornadas de ${formatMinutes(rule.scheduleDuration ?? 0)}`
   if (rule.ruleType === 'weekday') return WEEKDAY_NAMES[rule.weekday ?? 0]
   return rule.ruleType
 }
@@ -83,21 +84,21 @@ function BreakRuleForm({
             onChange={(e) => set('ruleType', e.target.value)}
             className="w-full rounded border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           >
-            <option value="always">Every day</option>
-            <option value="schedule_duration">On specific schedule duration</option>
-            <option value="weekday">On specific weekday</option>
+            <option value="always">Todos los días</option>
+            <option value="schedule_duration">En jornadas de duración específica</option>
+            <option value="weekday">En día de la semana concreto</option>
           </select>
         </div>
 
         {form.ruleType === 'schedule_duration' && (
           <div>
-            <label className="text-xs text-muted-foreground">Schedule duration (minutes)</label>
+            <label className="text-xs text-muted-foreground">Duración de jornada (minutos)</label>
             <input
               type="number"
               min={1}
               value={form.scheduleDuration}
               onChange={(e) => set('scheduleDuration', e.target.value)}
-              placeholder="e.g. 495 for 8h15m"
+              placeholder="p. ej. 495 para 8h15m"
               required
               className="w-full rounded border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
@@ -106,14 +107,14 @@ function BreakRuleForm({
 
         {form.ruleType === 'weekday' && (
           <div>
-            <label className="text-xs text-muted-foreground">Weekday</label>
+            <label className="text-xs text-muted-foreground">Día de la semana</label>
             <select
               value={form.weekday}
               onChange={(e) => set('weekday', e.target.value)}
               required
               className="w-full rounded border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              <option value="">Select…</option>
+              <option value="">Seleccionar…</option>
               {WEEKDAY_NAMES.map((d, i) => (
                 <option key={i} value={i}>{d}</option>
               ))}
@@ -124,17 +125,16 @@ function BreakRuleForm({
 
       <div className="grid grid-cols-3 gap-3">
         <div>
-          <label className="text-xs text-muted-foreground">Break start</label>
-          <input
-            type="time"
+          <label className="text-xs text-muted-foreground">Inicio de pausa</label>
+          <TimeInput
             value={form.breakStart}
-            onChange={(e) => set('breakStart', e.target.value)}
+            onChange={(v) => set('breakStart', v)}
             required
             className="w-full rounded border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground">Duration (min)</label>
+          <label className="text-xs text-muted-foreground">Duración (min)</label>
           <input
             type="number"
             min={1}
@@ -145,12 +145,12 @@ function BreakRuleForm({
           />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground">Label (optional)</label>
+          <label className="text-xs text-muted-foreground">Etiqueta (opcional)</label>
           <input
             type="text"
             value={form.label}
             onChange={(e) => set('label', e.target.value)}
-            placeholder="e.g. Lunch"
+            placeholder="p. ej. Comida"
             className="w-full rounded border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
@@ -161,10 +161,10 @@ function BreakRuleForm({
       <div className="flex gap-2">
         <button type="submit" disabled={saving}
           className="rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
-          {saving ? 'Saving…' : initial ? 'Update' : 'Add break rule'}
+          {saving ? 'Guardando…' : initial ? 'Actualizar' : 'Añadir regla de pausa'}
         </button>
         <button type="button" onClick={onCancel} className="rounded border border-border px-3 py-1.5 text-xs hover:bg-accent">
-          Cancel
+          Cancelar
         </button>
       </div>
     </form>
@@ -250,13 +250,13 @@ function McpConfigExamples({ apiKey }: { apiKey: string | null }) {
         className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
         <span className={`transition-transform ${open ? 'rotate-90' : ''}`}>▶</span>
-        How to connect an AI assistant
+        Cómo conectar un asistente de IA
       </button>
 
       {open && (
         <div className="mt-3 space-y-4">
           <div className="text-xs text-muted-foreground bg-muted/40 rounded-md px-3 py-2">
-            The MCP server URL is <code className="font-mono text-foreground/80">{url}</code>
+            La URL del servidor MCP es <code className="font-mono text-foreground/80">{url}</code>
           </div>
 
           <div>
@@ -264,7 +264,7 @@ function McpConfigExamples({ apiKey }: { apiKey: string | null }) {
               VS Code — GitHub Copilot
             </p>
             <p className="text-xs text-muted-foreground mb-2">
-              Add to <code className="font-mono">.vscode/mcp.json</code> in your workspace, or to VS Code user settings under <code className="font-mono">mcp.servers</code>.
+              Añade a <code className="font-mono">.vscode/mcp.json</code> en tu workspace, o a los ajustes de usuario de VS Code bajo <code className="font-mono">mcp.servers</code>.
             </p>
             <CodeBlock code={vscodeConfig} label=".vscode/mcp.json" />
           </div>
@@ -274,7 +274,7 @@ function McpConfigExamples({ apiKey }: { apiKey: string | null }) {
               Claude Desktop
             </p>
             <p className="text-xs text-muted-foreground mb-2">
-              Add to <code className="font-mono">claude_desktop_config.json</code> — on macOS at{' '}
+              Añade a <code className="font-mono">claude_desktop_config.json</code> — en macOS en{' '}
               <code className="font-mono">~/Library/Application Support/Claude/</code>.
             </p>
             <CodeBlock code={claudeDesktopConfig} label="claude_desktop_config.json" />
@@ -285,7 +285,7 @@ function McpConfigExamples({ apiKey }: { apiKey: string | null }) {
               Claude Code (CLI)
             </p>
             <p className="text-xs text-muted-foreground mb-2">
-              Run once in your terminal to register the server:
+              Ejecuta una vez en tu terminal para registrar el servidor:
             </p>
             <CodeBlock code={claudeCodeCmd} label="Terminal" />
           </div>
@@ -295,16 +295,16 @@ function McpConfigExamples({ apiKey }: { apiKey: string | null }) {
   )
 }
 
-const WEEKDAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
-const MONTH_NAMES = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December']
+const WEEKDAY_NAMES = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado']
+const MONTH_NAMES = ['Enero', 'Febrero', 'Marzo', 'Abril', 'Mayo', 'Junio', 'Julio', 'Agosto', 'Septiembre', 'Octubre', 'Noviembre', 'Diciembre']
 
 function ruleLabel(rule: ScheduleRule): string {
   if (rule.label) return rule.label
   switch (rule.ruleType) {
-    case 'default': return 'Default (all days)'
+    case 'default': return 'Por defecto (todos los días)'
     case 'weekday': return WEEKDAY_NAMES[rule.weekday ?? 0]
     case 'month': return MONTH_NAMES[(rule.month ?? 1) - 1]
-    case 'date': return rule.specificDate ?? 'Specific date'
+    case 'date': return rule.specificDate ?? 'Fecha específica'
     default: return rule.ruleType
   }
 }
@@ -391,28 +391,28 @@ function RuleForm({
     <form onSubmit={save} className="rounded-lg border border-primary/30 bg-card p-4 space-y-3 mt-2">
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-xs text-muted-foreground">Rule type</label>
+          <label className="text-xs text-muted-foreground">Tipo de regla</label>
           <select
             value={form.ruleType}
             onChange={(e) => set('ruleType', e.target.value)}
             className="w-full rounded border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           >
-            <option value="default">Default</option>
-            <option value="weekday">Weekday</option>
-            <option value="month">Month</option>
-            <option value="date">Specific date</option>
+            <option value="default">Por defecto</option>
+            <option value="weekday">Día de la semana</option>
+            <option value="month">Mes</option>
+            <option value="date">Fecha específica</option>
           </select>
         </div>
 
         {(form.ruleType === 'weekday' || form.ruleType === 'month') && (
           <div>
-            <label className="text-xs text-muted-foreground">Weekday</label>
+            <label className="text-xs text-muted-foreground">Día de la semana</label>
             <select
               value={form.weekday}
               onChange={(e) => set('weekday', e.target.value)}
               className="w-full rounded border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              <option value="">Any</option>
+              <option value="">Cualquiera</option>
               {WEEKDAY_NAMES.map((d, i) => (
                 <option key={i} value={i}>{d}</option>
               ))}
@@ -422,14 +422,14 @@ function RuleForm({
 
         {form.ruleType === 'month' && (
           <div>
-            <label className="text-xs text-muted-foreground">Month</label>
+            <label className="text-xs text-muted-foreground">Mes</label>
             <select
               value={form.month}
               onChange={(e) => set('month', e.target.value)}
               required
               className="w-full rounded border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              <option value="">Select…</option>
+              <option value="">Seleccionar…</option>
               {MONTH_NAMES.map((m, i) => (
                 <option key={i} value={i + 1}>{m}</option>
               ))}
@@ -439,7 +439,7 @@ function RuleForm({
 
         {form.ruleType === 'date' && (
           <div>
-            <label className="text-xs text-muted-foreground">Date</label>
+            <label className="text-xs text-muted-foreground">Fecha</label>
             <input
               type="date"
               value={form.specificDate}
@@ -453,7 +453,7 @@ function RuleForm({
 
       <div className="grid grid-cols-2 gap-3">
         <div>
-          <label className="text-xs text-muted-foreground">Duration</label>
+          <label className="text-xs text-muted-foreground">Duración</label>
           <div className="flex items-center gap-1">
             <input
               type="number"
@@ -476,12 +476,12 @@ function RuleForm({
           </div>
         </div>
         <div>
-          <label className="text-xs text-muted-foreground">Label (optional)</label>
+          <label className="text-xs text-muted-foreground">Etiqueta (opcional)</label>
           <input
             type="text"
             value={form.label}
             onChange={(e) => set('label', e.target.value)}
-            placeholder="e.g. Summer hours"
+            placeholder="p. ej. Horario de verano"
             className="w-full rounded border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
         </div>
@@ -495,13 +495,53 @@ function RuleForm({
           disabled={saving}
           className="rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
-          {saving ? 'Saving…' : initial ? 'Update rule' : 'Add rule'}
+          {saving ? 'Guardando…' : initial ? 'Actualizar regla' : 'Añadir regla'}
         </button>
         <button type="button" onClick={onCancel} className="rounded border border-border px-3 py-1.5 text-xs hover:bg-accent">
-          Cancel
+          Cancelar
         </button>
       </div>
     </form>
+  )
+}
+
+const WEEKEND_KEY = 'wl:showWeekends'
+
+function WeekendToggle() {
+  const [showWeekends, setShowWeekends] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem(WEEKEND_KEY) === 'true'
+  })
+
+  function toggle() {
+    setShowWeekends((v) => {
+      const next = !v
+      localStorage.setItem(WEEKEND_KEY, String(next))
+      return next
+    })
+  }
+
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-sm font-medium">Mostrar fin de semana</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Muestra sábado y domingo en la vista semanal del historial
+        </p>
+      </div>
+      <button
+        onClick={toggle}
+        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+          showWeekends ? 'bg-primary' : 'bg-muted'
+        }`}
+      >
+        <span
+          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+            showWeekends ? 'translate-x-4' : 'translate-x-1'
+          }`}
+        />
+      </button>
+    </div>
   )
 }
 
@@ -593,18 +633,18 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-4xl mx-auto space-y-6">
-      <h1 className="text-2xl font-bold">Settings</h1>
+      <h1 className="text-2xl font-bold">Ajustes</h1>
 
-      {/* Schedule rules */}
+      {/* Horario de trabajo */}
       <section className="rounded-lg border border-border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Work schedule</h2>
+          <h2 className="text-lg font-semibold">Horario de trabajo</h2>
           {!showAddForm && (
             <button
               onClick={() => setShowAddForm(true)}
               className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
             >
-              + Add rule
+              + Añadir regla
             </button>
           )}
         </div>
@@ -629,13 +669,13 @@ export default function SettingsPage() {
                       onClick={() => setEditingId(rule.id)}
                       className="text-xs text-muted-foreground hover:text-foreground"
                     >
-                      Edit
+                      Editar
                     </button>
                     <button
                       onClick={() => deleteRule(rule.id)}
                       className="text-xs text-muted-foreground hover:text-destructive"
                     >
-                      Remove
+                      Eliminar
                     </button>
                   </div>
                 </div>
@@ -644,7 +684,7 @@ export default function SettingsPage() {
           ))}
 
           {rules.length === 0 && !showAddForm && (
-            <p className="text-sm text-muted-foreground">No rules defined. Using default 8h15m.</p>
+            <p className="text-sm text-muted-foreground">Sin reglas definidas. Se usa el valor por defecto de 8h15m.</p>
           )}
         </div>
 
@@ -654,18 +694,44 @@ export default function SettingsPage() {
             onCancel={() => setShowAddForm(false)}
           />
         )}
+
+        {/* Prioridades del sistema de horarios */}
+        <details className="mt-4 group">
+          <summary className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors cursor-pointer list-none select-none">
+            <span className="transition-transform group-open:rotate-90">▶</span>
+            Prioridades de las reglas
+          </summary>
+          <div className="mt-3 rounded-md border border-border overflow-hidden text-xs">
+            <table className="w-full">
+              <thead>
+                <tr className="bg-muted/50 text-left">
+                  <th className="px-3 py-2 font-semibold text-muted-foreground">Prioridad</th>
+                  <th className="px-3 py-2 font-semibold text-muted-foreground">Tipo de regla</th>
+                  <th className="px-3 py-2 font-semibold text-muted-foreground">Descripción</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                <tr><td className="px-3 py-2 font-mono text-primary">1 (máx)</td><td className="px-3 py-2">Fecha específica</td><td className="px-3 py-2 text-muted-foreground">Coincide con un día exacto (YYYY-MM-DD)</td></tr>
+                <tr><td className="px-3 py-2 font-mono">2</td><td className="px-3 py-2">Mes + día de semana</td><td className="px-3 py-2 text-muted-foreground">P. ej., viernes de agosto</td></tr>
+                <tr><td className="px-3 py-2 font-mono">3</td><td className="px-3 py-2">Mes (todos los días)</td><td className="px-3 py-2 text-muted-foreground">Aplica a todos los días de un mes</td></tr>
+                <tr><td className="px-3 py-2 font-mono">4</td><td className="px-3 py-2">Día de la semana</td><td className="px-3 py-2 text-muted-foreground">P. ej., todos los viernes</td></tr>
+                <tr><td className="px-3 py-2 font-mono text-muted-foreground">5 (mín)</td><td className="px-3 py-2">Por defecto</td><td className="px-3 py-2 text-muted-foreground">Fallback para cualquier día sin regla más específica</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </details>
       </section>
 
-      {/* Break rules */}
+      {/* Reglas de pausas */}
       <section className="rounded-lg border border-border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold">Scheduled breaks</h2>
+          <h2 className="text-lg font-semibold">Pausas programadas</h2>
           {!showAddBreak && (
             <button
               onClick={() => setShowAddBreak(true)}
               className="rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90"
             >
-              + Add rule
+              + Añadir regla
             </button>
           )}
         </div>
@@ -687,8 +753,8 @@ export default function SettingsPage() {
                     <span className="text-xs text-muted-foreground ml-1">{rule.durationMinutes}m</span>
                   </div>
                   <div className="flex gap-3">
-                    <button onClick={() => setEditingBreakId(rule.id)} className="text-xs text-muted-foreground hover:text-foreground">Edit</button>
-                    <button onClick={() => deleteBreakRule(rule.id)} className="text-xs text-muted-foreground hover:text-destructive">Remove</button>
+                    <button onClick={() => setEditingBreakId(rule.id)} className="text-xs text-muted-foreground hover:text-foreground">Editar</button>
+                    <button onClick={() => deleteBreakRule(rule.id)} className="text-xs text-muted-foreground hover:text-destructive">Eliminar</button>
                   </div>
                 </div>
               )}
@@ -696,7 +762,7 @@ export default function SettingsPage() {
           ))}
 
           {breakRules.length === 0 && !showAddBreak && (
-            <p className="text-sm text-muted-foreground">No break rules defined.</p>
+            <p className="text-sm text-muted-foreground">Sin reglas de pausa definidas.</p>
           )}
         </div>
 
@@ -708,15 +774,21 @@ export default function SettingsPage() {
         )}
       </section>
 
+      {/* Calendario */}
+      <section className="rounded-lg border border-border bg-card p-6">
+        <h2 className="text-lg font-semibold mb-4">Calendario</h2>
+        <WeekendToggle />
+      </section>
+
       {/* MCP API key */}
       <section className="rounded-lg border border-border bg-card p-6">
-        <h2 className="text-lg font-semibold mb-2">MCP API Key</h2>
+        <h2 className="text-lg font-semibold mb-2">Clave API MCP</h2>
         <p className="text-sm text-muted-foreground mb-4">
-          Use this key to connect AI assistants (Claude, Copilot) to your WiseLogger data.
+          Usa esta clave para conectar asistentes de IA (Claude, Copilot) a tus datos de WiseLogger.
         </p>
         {apiKey ? (
           <div className="rounded-md bg-muted p-3">
-            <p className="text-xs text-muted-foreground mb-1">Copy this key — it will not be shown again:</p>
+            <p className="text-xs text-muted-foreground mb-1">Copia esta clave — no volverá a mostrarse:</p>
             <code className="text-sm break-all select-all">{apiKey}</code>
           </div>
         ) : (
@@ -725,19 +797,19 @@ export default function SettingsPage() {
             disabled={generatingKey}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
           >
-            {generatingKey ? 'Generating…' : 'Generate new key'}
+            {generatingKey ? 'Generando…' : 'Generar nueva clave'}
           </button>
         )}
 
         <McpConfigExamples apiKey={apiKey} />
       </section>
 
-      {/* Username */}
+      {/* Nombre de usuario */}
       <section className="rounded-lg border border-border bg-card p-6">
-        <h2 className="text-lg font-semibold mb-4">Username</h2>
+        <h2 className="text-lg font-semibold mb-4">Nombre de usuario</h2>
         <form onSubmit={changeUsername} className="flex gap-3 items-end">
           <div className="flex-1">
-            <label className="block text-xs text-muted-foreground mb-1">Display name</label>
+            <label className="block text-xs text-muted-foreground mb-1">Nombre visible</label>
             <input
               type="text"
               value={username}
@@ -747,23 +819,23 @@ export default function SettingsPage() {
             />
           </div>
           <button type="submit" className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-            Save
+            Guardar
           </button>
         </form>
         {usernameMsg && (
-          <p className={`text-sm mt-2 ${usernameMsg === 'Username updated' ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
-            {usernameMsg}
+          <p className={`text-sm mt-2 ${usernameMsg.includes('actualizado') || usernameMsg.includes('updated') ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
+            {usernameMsg === 'Username updated' ? 'Nombre actualizado' : usernameMsg}
           </p>
         )}
       </section>
 
-      {/* Change password */}
+      {/* Cambiar contraseña */}
       <section className="rounded-lg border border-border bg-card p-6">
-        <h2 className="text-lg font-semibold mb-4">Change password</h2>
+        <h2 className="text-lg font-semibold mb-4">Cambiar contraseña</h2>
         <form onSubmit={changePassword} className="space-y-3">
           <input
             type="password"
-            placeholder="Current password"
+            placeholder="Contraseña actual"
             value={oldPassword}
             onChange={(e) => setOldPassword(e.target.value)}
             required
@@ -771,16 +843,16 @@ export default function SettingsPage() {
           />
           <input
             type="password"
-            placeholder="New password (min 8 chars)"
+            placeholder="Nueva contraseña (mín. 8 caracteres)"
             value={newPassword}
             onChange={(e) => setNewPassword(e.target.value)}
             required
             minLength={8}
             className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
           />
-          {passwordMsg && <p className="text-sm text-muted-foreground">{passwordMsg}</p>}
+          {passwordMsg && <p className="text-sm text-muted-foreground">{passwordMsg === 'Password changed successfully' ? 'Contraseña cambiada correctamente' : passwordMsg}</p>}
           <button type="submit" className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90">
-            Change password
+            Cambiar contraseña
           </button>
         </form>
       </section>

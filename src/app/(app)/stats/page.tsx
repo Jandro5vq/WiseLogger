@@ -52,7 +52,7 @@ export default function StatsPage() {
   return (
     <div className="max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Stats</h1>
+        <h1 className="text-2xl font-bold">Estadísticas</h1>
         <div className="flex rounded-md border border-border overflow-hidden">
           {(['week', 'month', 'year'] as Period[]).map((p) => (
             <button
@@ -64,7 +64,7 @@ export default function StatsPage() {
                   : 'text-muted-foreground hover:bg-accent'
               }`}
             >
-              {p}
+              {p === 'week' ? 'Semana' : p === 'month' ? 'Mes' : 'Año'}
             </button>
           ))}
         </div>
@@ -73,11 +73,11 @@ export default function StatsPage() {
       {data && (
         <div className="grid grid-cols-3 gap-4">
           <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Worked</p>
+            <p className="text-xs text-muted-foreground">Trabajado</p>
             <p className="text-xl font-bold">{formatMinutes(data.totalWorkedMinutes)}</p>
           </div>
           <div className="rounded-lg border border-border bg-card p-4">
-            <p className="text-xs text-muted-foreground">Expected</p>
+            <p className="text-xs text-muted-foreground">Esperado</p>
             <p className="text-xl font-bold">{formatMinutes(data.totalExpectedMinutes)}</p>
           </div>
           <div className="rounded-lg border border-border bg-card p-4">
@@ -91,35 +91,35 @@ export default function StatsPage() {
 
       {data && data.days.length > 0 && (
         <div className="rounded-lg border border-border bg-card p-4">
-          <h2 className="text-sm font-medium mb-4">Hours per day</h2>
+          <h2 className="text-sm font-medium mb-4">Horas por día</h2>
           <HoursBarChart days={data.days} />
         </div>
       )}
 
       {allDays.length > 0 && (
         <div className="rounded-lg border border-border bg-card p-4">
-          <h2 className="text-sm font-medium mb-4">Cumulative balance</h2>
+          <h2 className="text-sm font-medium mb-4">Balance acumulado</h2>
           <BalanceLineChart days={allDays} />
         </div>
       )}
 
       {allDays.length > 0 && (
         <div className="rounded-lg border border-border bg-card p-4">
-          <h2 className="text-sm font-medium mb-4">Activity</h2>
+          <h2 className="text-sm font-medium mb-4">Actividad</h2>
           <ActivityHeatmap days={allDays} />
         </div>
       )}
 
       {data && data.days.length > 0 && (
         <div className="rounded-lg border border-border bg-card p-4">
-          <h2 className="text-sm font-medium mb-3">Daily breakdown</h2>
+          <h2 className="text-sm font-medium mb-3">Desglose diario</h2>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-border text-left text-xs text-muted-foreground">
-                  <th className="pb-2 font-medium">Date</th>
-                  <th className="pb-2 font-medium text-right">Worked</th>
-                  <th className="pb-2 font-medium text-right">Expected</th>
+                  <th className="pb-2 font-medium">Fecha</th>
+                  <th className="pb-2 font-medium text-right">Trabajado</th>
+                  <th className="pb-2 font-medium text-right">Esperado</th>
                   <th className="pb-2 font-medium text-right">Balance</th>
                 </tr>
               </thead>
@@ -144,21 +144,21 @@ export default function StatsPage() {
       )}
 
       <div className="rounded-lg border border-border bg-card p-4">
-        <h2 className="text-sm font-medium mb-3">Export</h2>
+        <h2 className="text-sm font-medium mb-3">Exportar</h2>
         <div className="flex gap-2">
           <a
             href="/api/export/csv"
             download
             className="rounded-md border border-border px-4 py-2 text-sm hover:bg-accent transition-colors"
           >
-            Download CSV
+            Descargar CSV
           </a>
           <a
             href="/api/export/json"
             download
             className="rounded-md border border-border px-4 py-2 text-sm hover:bg-accent transition-colors"
           >
-            Download JSON
+            Descargar JSON
           </a>
         </div>
       </div>

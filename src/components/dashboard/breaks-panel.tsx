@@ -2,6 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
+import { TimeInput } from '@/components/ui/time-input'
 
 interface EntryBreak {
   id: string
@@ -46,17 +47,16 @@ function BreakForm({
   return (
     <form onSubmit={save} className="flex items-end gap-2 flex-wrap">
       <div>
-        <label className="text-xs text-muted-foreground block mb-1">Time</label>
-        <input
-          type="time"
+        <label className="text-xs text-muted-foreground block mb-1">Hora</label>
+        <TimeInput
           value={breakStart}
-          onChange={(e) => setBreakStart(e.target.value)}
+          onChange={setBreakStart}
           required
           className="rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         />
       </div>
       <div>
-        <label className="text-xs text-muted-foreground block mb-1">Duration (min)</label>
+        <label className="text-xs text-muted-foreground block mb-1">Duración (min)</label>
         <input
           type="number"
           min={1}
@@ -68,7 +68,7 @@ function BreakForm({
         />
       </div>
       <div className="flex-1 min-w-[8rem]">
-        <label className="text-xs text-muted-foreground block mb-1">Label</label>
+        <label className="text-xs text-muted-foreground block mb-1">Etiqueta</label>
         <input
           type="text"
           value={label}
@@ -83,10 +83,10 @@ function BreakForm({
           disabled={saving}
           className="rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
-          {saving ? 'Saving…' : 'Save'}
+          {saving ? 'Guardando…' : 'Guardar'}
         </button>
         <button type="button" onClick={onCancel} className="rounded border border-border px-3 py-1 text-xs hover:bg-accent">
-          Cancel
+          Cancelar
         </button>
       </div>
     </form>
@@ -149,7 +149,7 @@ export function BreaksPanel({
     <div className="rounded-lg border border-border bg-card">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
         <div className="flex items-center gap-2">
-          <h2 className="text-sm font-medium">Breaks</h2>
+          <h2 className="text-sm font-medium">Pausas</h2>
           {total > 0 && (
             <span className="text-xs text-muted-foreground font-mono">
               {total}m total
@@ -161,14 +161,14 @@ export function BreaksPanel({
             onClick={() => setShowAdd(true)}
             className="text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
-            + Add break
+            + Añadir pausa
           </button>
         )}
       </div>
 
       <div className="p-4 space-y-2">
         {breaks.length === 0 && !showAdd && (
-          <p className="text-xs text-muted-foreground text-center py-2">No breaks scheduled today.</p>
+          <p className="text-xs text-muted-foreground text-center py-2">Sin pausas programadas hoy.</p>
         )}
 
         {breaks.map((b) => (
@@ -211,18 +211,16 @@ export function BreaksPanel({
         {showAdd && (
           <form onSubmit={addBreak} className="flex items-end gap-2 flex-wrap pt-1">
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Time</label>
-              <input
-                type="time"
+              <label className="text-xs text-muted-foreground block mb-1">Hora</label>
+              <TimeInput
                 value={addStart}
-                onChange={(e) => setAddStart(e.target.value)}
+                onChange={setAddStart}
                 required
-                autoFocus
                 className="rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">Duration (min)</label>
+              <label className="text-xs text-muted-foreground block mb-1">Duración (min)</label>
               <input
                 type="number"
                 min={1}
@@ -234,12 +232,12 @@ export function BreaksPanel({
               />
             </div>
             <div className="flex-1 min-w-[8rem]">
-              <label className="text-xs text-muted-foreground block mb-1">Label</label>
+              <label className="text-xs text-muted-foreground block mb-1">Etiqueta</label>
               <input
                 type="text"
                 value={addLabel}
                 onChange={(e) => setAddLabel(e.target.value)}
-                placeholder="e.g. Lunch"
+                placeholder="p. ej. Comida"
                 className="w-full rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
@@ -249,10 +247,10 @@ export function BreaksPanel({
                 disabled={adding}
                 className="rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
               >
-                {adding ? 'Adding…' : 'Add'}
+                {adding ? 'Añadiendo…' : 'Añadir'}
               </button>
               <button type="button" onClick={() => setShowAdd(false)} className="rounded border border-border px-3 py-1 text-xs hover:bg-accent">
-                Cancel
+                Cancelar
               </button>
             </div>
           </form>

@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { formatMinutes, isoToLocalInput } from '@/lib/utils'
 import type { TaskWithTags } from '@/types/db'
+import { DateTimeInput } from '@/components/ui/date-time-input'
 
 // ─── edit form for a single segment ──────────────────────────────────────────
 
@@ -14,12 +15,14 @@ function EditTaskForm({ task, onDone }: { task: TaskWithTags; onDone: () => void
   const [startTime, setStartTime] = useState(isoToLocalInput(task.startTime))
   const [endTime, setEndTime] = useState(task.endTime ? isoToLocalInput(task.endTime) : '')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
+    setError('')
     const tags = tagsInput.split(',').map((t) => t.trim()).filter(Boolean)
-    await fetch(`/api/tasks/${task.id}`, {
+    const res = await fetch(`/api/tasks/${task.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -30,6 +33,11 @@ function EditTaskForm({ task, onDone }: { task: TaskWithTags; onDone: () => void
       }),
     })
     setSaving(false)
+    if (!res.ok) {
+      const data = await res.json()
+      setError(data.error ?? 'Error al guardar')
+      return
+    }
     onDone()
     router.refresh()
   }
@@ -47,44 +55,34 @@ function EditTaskForm({ task, onDone }: { task: TaskWithTags; onDone: () => void
         type="text"
         value={tagsInput}
         onChange={(e) => setTagsInput(e.target.value)}
-        placeholder="Tags (comma-separated)"
+        placeholder="Etiquetas (separadas por coma)"
         className="w-full rounded border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
       />
       <div className="grid grid-cols-2 gap-2">
         <div>
-          <label className="text-xs text-muted-foreground">Start</label>
-          <input
-            type="datetime-local"
-            value={startTime}
-            onChange={(e) => setStartTime(e.target.value)}
-            required
-            className="w-full rounded border border-input bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
-          />
+          <label className="text-xs text-muted-foreground">Inicio</label>
+          <DateTimeInput value={startTime} onChange={setStartTime} required />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground">End</label>
-          <input
-            type="datetime-local"
-            value={endTime}
-            onChange={(e) => setEndTime(e.target.value)}
-            className="w-full rounded border border-input bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring"
-          />
+          <label className="text-xs text-muted-foreground">Fin</label>
+          <DateTimeInput value={endTime} onChange={setEndTime} />
         </div>
       </div>
+      {error && <p className="text-xs text-destructive">{error}</p>}
       <div className="flex gap-2 pt-1">
         <button
           type="submit"
           disabled={saving}
           className="rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
         >
-          {saving ? 'Saving…' : 'Save'}
+          {saving ? 'Guardando…' : 'Guardar'}
         </button>
         <button
           type="button"
           onClick={onDone}
           className="rounded border border-border px-3 py-1 text-xs hover:bg-accent"
         >
-          Cancel
+          Cancelar
         </button>
       </div>
     </form>
@@ -136,7 +134,8 @@ function TaskGroup({
     router.refresh()
   }
 
-  async function resume() {
+  async function resume(e: React.MouseEvent) {
+    e.stopPropagation()
     if (activeTaskId) {
       await fetch(`/api/tasks/${activeTaskId}/stop`, { method: 'POST' })
     }
@@ -154,8 +153,11 @@ function TaskGroup({
 
   return (
     <div className="rounded-lg border border-border bg-card overflow-hidden">
-      {/* summary row */}
-      <div className="flex items-center justify-between px-3 py-2.5 gap-3">
+      {/* summary row — entire row is clickable to expand */}
+      <div
+        className="flex items-center justify-between px-3 py-2.5 gap-3 cursor-pointer hover:bg-accent/50 transition-colors"
+        onClick={() => { if (spans > 1) setExpanded((v) => !v) }}
+      >
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium truncate" title={description}>{description}</p>
           <div className="flex items-center gap-2 mt-0.5 flex-wrap">
@@ -167,7 +169,7 @@ function TaskGroup({
             </span>
             {spans > 1 && (
               <span className="text-xs text-muted-foreground">
-                {spans} sessions
+                {spans} sesiones
               </span>
             )}
           </div>
@@ -177,32 +179,23 @@ function TaskGroup({
           <button
             onClick={resume}
             className="text-xs text-muted-foreground hover:text-primary transition-colors px-1"
-            title="Resume task"
+            title="Reanudar tarea"
           >
             ▶
           </button>
-          {spans > 1 && (
-            <button
-              onClick={() => setExpanded((v) => !v)}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1"
-              title={expanded ? 'Collapse' : 'Show sessions'}
-            >
-              {expanded ? '▲' : '▼'}
-            </button>
-          )}
           {spans === 1 && (
             <button
-              onClick={() => setEditingId(segments[0].id)}
+              onClick={(e) => { e.stopPropagation(); setEditingId(segments[0].id) }}
               className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1"
-              title="Edit"
+              title="Editar"
             >
               ✎
             </button>
           )}
           <button
-            onClick={deleteAll}
+            onClick={(e) => { e.stopPropagation(); deleteAll() }}
             className="text-xs text-muted-foreground hover:text-destructive transition-colors px-1"
-            title="Delete"
+            title="Eliminar"
           >
             ✕
           </button>
@@ -275,7 +268,7 @@ export function TaskList({
   if (tasks.length === 0) {
     return (
       <p className="text-sm text-muted-foreground text-center py-8">
-        No tasks yet. Press <kbd className="font-mono bg-muted px-1 rounded">N</kbd> to add one.
+        Sin tareas. Pulsa <kbd className="font-mono bg-muted px-1 rounded">N</kbd> para añadir una.
       </p>
     )
   }
