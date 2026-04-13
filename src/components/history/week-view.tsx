@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { formatMinutes } from '@/lib/utils'
 import type { TaskWithTags } from '@/types/db'
-import { ArrowLeft, ArrowRight } from 'pixelarticons/react'
+import { ArrowLeftBox, ArrowRightBox } from 'pixelarticons/react'
 
 // Use local date to avoid UTC offset shifting the day
 function localDate(d: Date): string {
@@ -128,7 +128,7 @@ function DayCard({ day, index }: { day: DayData; index: number }) {
           ) : (
             <span className="text-muted-foreground/50 text-xs">sin datos</span>
           )}
-          <ArrowRight width={14} height={14} className="text-muted-foreground" />
+          <ArrowRightBox width={16} height={16} className="text-muted-foreground" />
         </div>
       </Link>
 
@@ -225,7 +225,7 @@ export function WeekView() {
           onClick={() => navigate(-1)}
           className="rounded-md p-2 hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft width={20} height={20} />
+          <ArrowLeftBox width={24} height={24} />
         </button>
         <div className="text-center">
           {data ? (
@@ -244,7 +244,7 @@ export function WeekView() {
           disabled={isCurrentWeek}
           className="rounded-md p-2 hover:bg-accent transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
         >
-          <ArrowRight width={20} height={20} />
+          <ArrowRightBox width={24} height={24} />
         </button>
       </div>
 

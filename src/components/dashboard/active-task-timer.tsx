@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatElapsed, todayISO, isoToLocalInput } from '@/lib/utils'
 import { DateTimeInput } from '@/components/ui/date-time-input'
-import { PenSquare } from 'pixelarticons/react'
+import { MagicEdit } from 'pixelarticons/react'
 import type { TaskWithTags } from '@/types/db'
 
 interface ActiveTaskTimerProps {
@@ -82,7 +82,7 @@ export function ActiveTaskTimer({ task, loadedDate }: ActiveTaskTimerProps) {
               className="text-muted-foreground hover:text-foreground transition-colors p-0.5"
               title="Editar tarea activa"
             >
-              <PenSquare width={16} height={16} />
+              <MagicEdit width={20} height={20} />
             </button>
           </div>
           <p className="text-base font-semibold mt-1 truncate" title={task.description}>{task.description}</p>

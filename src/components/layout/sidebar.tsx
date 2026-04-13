@@ -3,13 +3,13 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
-import { Clock, Calendar, ChartBarBig, SettingsCog, User, Logout } from 'pixelarticons/react'
+import { Clock, Calendar, ChartBarBig, Settings2, User, Logout } from 'pixelarticons/react'
 
 const navItems = [
   { href: '/dashboard', label: 'Hoy', Icon: Clock },
   { href: '/history', label: 'Historial', Icon: Calendar },
   { href: '/stats', label: 'Estadísticas', Icon: ChartBarBig },
-  { href: '/settings', label: 'Ajustes', Icon: SettingsCog },
+  { href: '/settings', label: 'Ajustes', Icon: Settings2 },
 ]
 
 export function Sidebar({ isAdmin }: { isAdmin: boolean }) {

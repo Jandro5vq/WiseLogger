@@ -5,7 +5,7 @@ import { useState } from 'react'
 import { formatMinutes, isoToLocalInput } from '@/lib/utils'
 import type { TaskWithTags } from '@/types/db'
 import { DateTimeInput } from '@/components/ui/date-time-input'
-import { Play, PenSquare, Cancel } from 'pixelarticons/react'
+import { Play, MagicEdit, Cancel } from 'pixelarticons/react'
 
 // ─── edit form for a single segment ──────────────────────────────────────────
 
@@ -187,7 +187,7 @@ function TaskGroup({
               className="text-muted-foreground hover:text-primary transition-colors p-0.5"
               title="Reanudar tarea"
             >
-              <Play width={16} height={16} />
+              <Play width={20} height={20} />
             </button>
           )}
           {spans === 1 && !isActive && (
@@ -196,7 +196,7 @@ function TaskGroup({
               className="text-muted-foreground hover:text-foreground transition-colors p-0.5"
               title="Editar"
             >
-              <PenSquare width={16} height={16} />
+              <MagicEdit width={20} height={20} />
             </button>
           )}
           <button
@@ -204,7 +204,7 @@ function TaskGroup({
             className="text-muted-foreground hover:text-destructive transition-colors p-0.5"
             title="Eliminar"
           >
-            <Cancel width={16} height={16} />
+            <Cancel width={20} height={20} />
           </button>
         </div>
       </div>
@@ -245,14 +245,14 @@ function TaskGroup({
                         onClick={() => setEditingId(seg.id)}
                         className="text-muted-foreground hover:text-foreground p-0.5"
                       >
-                        <PenSquare width={15} height={15} />
+                        <MagicEdit width={18} height={18} />
                       </button>
                     )}
                     <button
                       onClick={() => deleteSegment(seg.id)}
                       className="text-muted-foreground hover:text-destructive p-0.5"
                     >
-                      <Cancel width={15} height={15} />
+                      <Cancel width={18} height={18} />
                     </button>
                   </div>
                 </div>

@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { cn, formatMinutes } from '@/lib/utils'
 import type { DaySummary } from '@/lib/business/balance'
-import { ArrowLeft, ArrowRight } from 'pixelarticons/react'
+import { ArrowLeftBox, ArrowRightBox } from 'pixelarticons/react'
 
 interface MonthCalendarProps {
   year: number
@@ -43,14 +43,14 @@ export function MonthCalendar({ year, month, days, onNavigate }: MonthCalendarPr
           onClick={() => onNavigate(month === 1 ? year - 1 : year, month === 1 ? 12 : month - 1)}
           className="rounded-md p-2 hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
         >
-          <ArrowLeft width={20} height={20} />
+          <ArrowLeftBox width={24} height={24} />
         </button>
         <h2 className="font-semibold capitalize">{monthName}</h2>
         <button
           onClick={() => onNavigate(month === 12 ? year + 1 : year, month === 12 ? 1 : month + 1)}
           className="rounded-md p-2 hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
         >
-          <ArrowRight width={20} height={20} />
+          <ArrowRightBox width={24} height={24} />
         </button>
       </div>
 

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft } from 'pixelarticons/react'
+import { ArrowLeftBox } from 'pixelarticons/react'
 
 interface Invitation {
   id: string
@@ -63,7 +63,7 @@ export default function AdminInvitationsPage() {
     <div className="max-w-3xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
         <button onClick={() => router.back()} className="flex items-center gap-1 text-muted-foreground hover:text-foreground">
-          <ArrowLeft width={18} height={18} />
+          <ArrowLeftBox width={20} height={20} />
           Back
         </button>
         <h1 className="text-2xl font-bold">Invitations</h1>

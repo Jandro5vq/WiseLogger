@@ -3,7 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { TimeInput } from '@/components/ui/time-input'
-import { PenSquare, Cancel, Plus } from 'pixelarticons/react'
+import { MagicEdit, Cancel, Plus } from 'pixelarticons/react'
 
 interface EntryBreak {
   id: string
@@ -223,13 +223,13 @@ export function BreaksPanel({
                     onClick={() => setEditingId(b.id)}
                     className="text-muted-foreground hover:text-foreground p-0.5"
                   >
-                    <PenSquare width={16} height={16} />
+                    <MagicEdit width={20} height={20} />
                   </button>
                   <button
                     onClick={() => deleteBreak(b.id)}
                     className="text-muted-foreground hover:text-destructive p-0.5"
                   >
-                    <Cancel width={16} height={16} />
+                    <Cancel width={20} height={20} />
                   </button>
                 </div>
               </div>
