@@ -60,9 +60,14 @@ export function NewTaskForm({ entryId, activeTaskId, defaultStartTime }: NewTask
     setError('')
     setLoading(true)
 
-    // Stop currently active task first (pause it)
+    // Stop currently active task first, ending it at the new task's start time
     if (activeTaskId) {
-      await fetch(`/api/tasks/${activeTaskId}/stop`, { method: 'POST' })
+      const stopBody = startTime ? { endTime: new Date(startTime).toISOString() } : undefined
+      await fetch(`/api/tasks/${activeTaskId}/stop`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: stopBody ? JSON.stringify(stopBody) : undefined,
+      })
     }
 
     const tags = tagsInput.split(',').map((t) => t.trim()).filter(Boolean)

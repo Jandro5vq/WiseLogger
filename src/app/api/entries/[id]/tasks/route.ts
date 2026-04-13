@@ -58,11 +58,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
   }
 
-  // If starting a new active task, auto-stop any existing active task
+  // If starting a new active task, auto-stop any existing active task.
+  // Use the new task's startTime as the endTime so there's no gap.
   if (!endTime) {
     const active = getActiveTask(session.user.id)
     if (active) {
-      updateTask(active.id, { endTime: new Date().toISOString() })
+      updateTask(active.id, { endTime: startTime ?? new Date().toISOString() })
     }
   }
 

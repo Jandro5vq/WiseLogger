@@ -6,22 +6,38 @@ import { TimeInput } from '@/components/ui/time-input'
 
 interface EntryBreak {
   id: string
-  breakStart: string   // 'HH:MM'
+  breakStart: string   // UTC ISO string (new) or 'HH:MM' (legacy rule-seeded)
   durationMinutes: number
   label: string | null
   fromRuleId: string | null
 }
 
+/** Extract local HH:MM from a UTC ISO string or return the raw HH:MM for legacy breaks */
+function toLocalHHMM(breakStart: string): string {
+  if (breakStart.length > 5) {
+    const d = new Date(breakStart)
+    return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+  }
+  return breakStart
+}
+
+/** Convert a local HH:MM input + entry date to a UTC ISO string (runs in browser) */
+function localTimeToISO(entryDate: string, time: string): string {
+  return new Date(`${entryDate}T${time}:00`).toISOString()
+}
+
 function BreakForm({
   initial,
+  entryDate,
   onSave,
   onCancel,
 }: {
   initial?: EntryBreak
+  entryDate: string
   onSave: (b: EntryBreak) => void
   onCancel: () => void
 }) {
-  const [breakStart, setBreakStart] = useState(initial?.breakStart ?? '')
+  const [breakStart, setBreakStart] = useState(() => initial ? toLocalHHMM(initial.breakStart) : '')
   const [duration, setDuration] = useState(String(initial?.durationMinutes ?? 30))
   const [label, setLabel] = useState(initial?.label ?? '')
   const [saving, setSaving] = useState(false)
@@ -29,7 +45,11 @@ function BreakForm({
   async function save(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    const body = { breakStart, durationMinutes: parseInt(duration), label: label || null }
+    const body = {
+      breakStart: localTimeToISO(entryDate, breakStart),
+      durationMinutes: parseInt(duration),
+      label: label || null,
+    }
     const url = initial ? `/api/breaks/${initial.id}` : undefined
     // url is set by parent for POST (entryId required)
     if (initial) {
@@ -95,9 +115,11 @@ function BreakForm({
 
 export function BreaksPanel({
   entryId,
+  entryDate,
   initialBreaks,
 }: {
   entryId: string
+  entryDate: string
   initialBreaks: EntryBreak[]
 }) {
   const router = useRouter()
@@ -119,7 +141,11 @@ export function BreaksPanel({
     const res = await fetch(`/api/entries/${entryId}/breaks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ breakStart: addStart, durationMinutes: parseInt(addDuration), label: addLabel || null }),
+      body: JSON.stringify({
+        breakStart: localTimeToISO(entryDate, addStart),
+        durationMinutes: parseInt(addDuration),
+        label: addLabel || null,
+      }),
     })
     const data = await res.json()
     setAdding(false)
@@ -176,13 +202,14 @@ export function BreaksPanel({
             {editingId === b.id ? (
               <BreakForm
                 initial={b}
+                entryDate={entryDate}
                 onSave={handleEdited}
                 onCancel={() => setEditingId(null)}
               />
             ) : (
               <div className="flex items-center justify-between text-sm">
                 <div className="flex items-center gap-3">
-                  <span className="font-mono text-xs text-muted-foreground w-10">{b.breakStart}</span>
+                  <span className="font-mono text-xs text-muted-foreground w-10">{toLocalHHMM(b.breakStart)}</span>
                   <span className="font-medium tabular-nums">{b.durationMinutes}m</span>
                   {b.label && <span className="text-muted-foreground">{b.label}</span>}
                   {b.fromRuleId && (

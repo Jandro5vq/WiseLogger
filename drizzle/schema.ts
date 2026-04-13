@@ -8,6 +8,7 @@ export const users = sqliteTable('users', {
   role: text('role', { enum: ['admin', 'user'] }).notNull().default('user'),
   mcpApiKeyHash: text('mcp_api_key_hash'),
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
+  timezone: text('timezone').notNull().default('UTC'), // IANA timezone identifier
   createdAt: text('created_at').notNull(),
   lastLoginAt: text('last_login_at'),
 })
@@ -82,7 +83,7 @@ export const entryBreaks = sqliteTable('entry_breaks', {
   userId: text('user_id')
     .notNull()
     .references(() => users.id, { onDelete: 'cascade' }),
-  breakStart: text('break_start').notNull(), // 'HH:MM'
+  breakStart: text('break_start').notNull(), // UTC ISO 8601 (new) or 'HH:MM' local (legacy rule-seeded)
   durationMinutes: integer('duration_minutes').notNull(),
   label: text('label'),
   fromRuleId: text('from_rule_id'), // which rule generated this (info only)

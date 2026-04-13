@@ -76,6 +76,7 @@ export default async function DashboardPage() {
       <DayControls
         entryId={entry.id}
         entryStartTime={entryStartTime}
+        entryEndTime={entry.endTime ?? undefined}
         expectedEndTime={expectedEndIso}
         isClosed={isClosed}
         activeTaskId={activeTask?.id}
@@ -94,7 +95,7 @@ export default async function DashboardPage() {
 
       <DayTimeline tasks={allTasksSorted} breaks={breaks} entryDate={today} />
 
-      <BreaksPanel entryId={entry.id} initialBreaks={breaks} />
+      <BreaksPanel entryId={entry.id} entryDate={today} initialBreaks={breaks} />
 
       <div className="rounded-lg border border-border bg-card">
         <div className="border-b border-border px-4 py-3">

@@ -40,7 +40,7 @@ const BREAK_COLOR = '#64748b' // slate-500
 
 interface BreakRecord {
   id: string
-  breakStart: string   // HH:MM
+  breakStart: string   // UTC ISO string (new) or 'HH:MM' (legacy rule-seeded)
   durationMinutes: number
   label: string | null
 }
@@ -70,7 +70,9 @@ export function DayTimeline({ tasks, breaks = [], entryDate }: DayTimelineProps)
   // Compute break intervals as ms epoch
   const breakIntervals = hasBreaks
     ? breaks.map((b) => {
-        const startMs = new Date(`${entryDate}T${b.breakStart}:00`).getTime()
+        const startMs = b.breakStart.length > 5
+          ? new Date(b.breakStart).getTime()
+          : new Date(`${entryDate}T${b.breakStart}:00`).getTime()
         const endMs = startMs + b.durationMinutes * 60_000
         return { id: b.id, startMs, endMs, label: b.label, durationMinutes: b.durationMinutes }
       })

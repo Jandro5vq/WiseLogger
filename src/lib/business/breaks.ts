@@ -3,6 +3,34 @@ import { getBreakRules } from '@/lib/db/queries/break-rules'
 import { getEntryBreaks, createEntryBreak, getEntryBreakById } from '@/lib/db/queries/entry-breaks'
 import { listTasksForEntry } from '@/lib/db/queries/tasks'
 
+/**
+ * Convert a local HH:MM time on a given YYYY-MM-DD date to a UTC ISO string,
+ * using the provided IANA timezone.
+ * Falls back to treating HH:MM as server local time if the timezone is invalid.
+ */
+export function hhmmToUTC(dateStr: string, timeStr: string, timezone: string): string {
+  try {
+    // Build a "naive" UTC stamp treating the input as if it were UTC
+    const naive = new Date(`${dateStr}T${timeStr}:00Z`)
+    // Determine what local time that UTC moment reads as in the target timezone
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: false,
+    }).formatToParts(naive)
+    const p: Record<string, number> = {}
+    for (const { type, value } of parts) p[type] = parseInt(value)
+    const localH = (p.hour ?? 0) % 24  // some engines emit 24 for midnight
+    const [wantedH, wantedM] = timeStr.split(':').map(Number)
+    // Shift the naive stamp so its local representation equals the desired HH:MM
+    const offsetMs = (localH - wantedH) * 3_600_000 + ((p.minute ?? 0) - wantedM) * 60_000
+    return new Date(naive.getTime() - offsetMs).toISOString()
+  } catch {
+    return new Date(`${dateStr}T${timeStr}:00`).toISOString()
+  }
+}
+
 // ─── interval helpers ─────────────────────────────────────────────────────────
 
 export interface Interval {
@@ -10,12 +38,21 @@ export interface Interval {
   end: number
 }
 
-/** Convert an entryBreak (HH:MM + duration) to an absolute ISO interval using the entry date. */
+/**
+ * Convert an entryBreak to an absolute ISO interval.
+ * breakStart can be either:
+ *   - A full UTC ISO string (new format, created from the browser)
+ *   - 'HH:MM' local time (legacy / rule-seeded breaks). Converted using entryDate
+ *     and the server's local timezone — works correctly when server TZ matches user TZ.
+ */
 export function breakToInterval(
   breakRec: { breakStart: string; durationMinutes: number },
   entryDate: string
 ): { startIso: string; endIso: string } {
-  const startIso = new Date(`${entryDate}T${breakRec.breakStart}:00`).toISOString()
+  const isIso = breakRec.breakStart.length > 5
+  const startIso = isIso
+    ? breakRec.breakStart
+    : new Date(`${entryDate}T${breakRec.breakStart}:00`).toISOString()
   const endIso = new Date(new Date(startIso).getTime() + breakRec.durationMinutes * 60_000).toISOString()
   return { startIso, endIso }
 }
@@ -62,19 +99,21 @@ export function buildEntryIntervals(
 /**
  * Called once when a new entry is created.
  * Applies all matching break rules and seeds entryBreaks records.
+ * Break rule times (HH:MM) are converted to UTC ISO using the user's timezone.
  */
 export function applyBreakRulesForEntry(
   userId: string,
   entryId: string,
   date: string,
-  expectedMinutes: number
+  expectedMinutes: number,
+  timezone = 'UTC'
 ): void {
   const rules = getBreakRules(userId)
   const existing = getEntryBreaks(entryId)
   const existingRuleIds = new Set(existing.map((b) => b.fromRuleId).filter(Boolean))
 
   // Day-of-week for the entry date (0=Sun … 6=Sat)
-  const dayOfWeek = new Date(date + 'T12:00:00').getDay()
+  const dayOfWeek = new Date(date + 'T12:00:00Z').getDay()
 
   for (const rule of rules) {
     if (existingRuleIds.has(rule.id)) continue
@@ -89,7 +128,7 @@ export function applyBreakRulesForEntry(
         id: uuidv4(),
         entryId,
         userId,
-        breakStart: rule.breakStart,
+        breakStart: hhmmToUTC(date, rule.breakStart, timezone),
         durationMinutes: rule.durationMinutes,
         label: rule.label ?? null,
         fromRuleId: rule.id,

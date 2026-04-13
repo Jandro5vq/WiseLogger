@@ -505,6 +505,66 @@ function RuleForm({
   )
 }
 
+// Curated IANA timezone list covering all major regions and UTC offsets.
+// Used for the timezone search dropdown in settings.
+const IANA_TIMEZONES = [
+  'UTC',
+  // Americas
+  'America/Adak', 'America/Anchorage', 'America/Boise', 'America/Chicago',
+  'America/Denver', 'America/Detroit', 'America/Indiana/Indianapolis',
+  'America/Los_Angeles', 'America/New_York', 'America/Phoenix',
+  'America/Juneau', 'America/Honolulu',
+  'America/Argentina/Buenos_Aires', 'America/Argentina/Cordoba',
+  'America/Bogota', 'America/Caracas', 'America/Guayaquil',
+  'America/Halifax', 'America/Lima', 'America/Mexico_City',
+  'America/Monterrey', 'America/Montevideo', 'America/Noronha',
+  'America/Puerto_Rico', 'America/Santiago', 'America/Sao_Paulo',
+  'America/St_Johns', 'America/Tegucigalpa', 'America/Toronto',
+  'America/Vancouver', 'America/Winnipeg',
+  // Europe
+  'Europe/Amsterdam', 'Europe/Athens', 'Europe/Belgrade', 'Europe/Berlin',
+  'Europe/Brussels', 'Europe/Bucharest', 'Europe/Budapest',
+  'Europe/Copenhagen', 'Europe/Dublin', 'Europe/Helsinki',
+  'Europe/Istanbul', 'Europe/Kaliningrad', 'Europe/Kiev',
+  'Europe/Lisbon', 'Europe/London', 'Europe/Luxembourg',
+  'Europe/Madrid', 'Europe/Minsk', 'Europe/Moscow',
+  'Europe/Oslo', 'Europe/Paris', 'Europe/Prague',
+  'Europe/Riga', 'Europe/Rome', 'Europe/Samara',
+  'Europe/Sofia', 'Europe/Stockholm', 'Europe/Tallinn',
+  'Europe/Ulyanovsk', 'Europe/Vilnius', 'Europe/Warsaw',
+  'Europe/Vienna', 'Europe/Zurich',
+  // Africa
+  'Africa/Abidjan', 'Africa/Accra', 'Africa/Addis_Ababa', 'Africa/Algiers',
+  'Africa/Cairo', 'Africa/Casablanca', 'Africa/Johannesburg',
+  'Africa/Khartoum', 'Africa/Lagos', 'Africa/Maputo',
+  'Africa/Nairobi', 'Africa/Tripoli', 'Africa/Tunis',
+  // Asia
+  'Asia/Almaty', 'Asia/Amman', 'Asia/Anadyr', 'Asia/Aqtau',
+  'Asia/Baghdad', 'Asia/Bahrain', 'Asia/Baku', 'Asia/Bangkok',
+  'Asia/Beirut', 'Asia/Bishkek', 'Asia/Calcutta', 'Asia/Colombo',
+  'Asia/Damascus', 'Asia/Dhaka', 'Asia/Dubai', 'Asia/Dushanbe',
+  'Asia/Gaza', 'Asia/Ho_Chi_Minh', 'Asia/Hong_Kong', 'Asia/Irkutsk',
+  'Asia/Jakarta', 'Asia/Jerusalem', 'Asia/Kabul', 'Asia/Kamchatka',
+  'Asia/Karachi', 'Asia/Kathmandu', 'Asia/Kolkata', 'Asia/Krasnoyarsk',
+  'Asia/Kuala_Lumpur', 'Asia/Kuwait', 'Asia/Magadan', 'Asia/Makassar',
+  'Asia/Manila', 'Asia/Muscat', 'Asia/Nicosia', 'Asia/Novosibirsk',
+  'Asia/Omsk', 'Asia/Qatar', 'Asia/Riyadh', 'Asia/Samarkand',
+  'Asia/Seoul', 'Asia/Shanghai', 'Asia/Singapore', 'Asia/Tashkent',
+  'Asia/Tbilisi', 'Asia/Tehran', 'Asia/Thimphu', 'Asia/Tokyo',
+  'Asia/Ulaanbaatar', 'Asia/Vladivostok', 'Asia/Yakutsk', 'Asia/Yekaterinburg',
+  'Asia/Yerevan',
+  // Oceania
+  'Australia/Adelaide', 'Australia/Brisbane', 'Australia/Darwin',
+  'Australia/Hobart', 'Australia/Lord_Howe', 'Australia/Melbourne',
+  'Australia/Perth', 'Australia/Sydney',
+  'Pacific/Auckland', 'Pacific/Chatham', 'Pacific/Easter',
+  'Pacific/Fiji', 'Pacific/Galapagos', 'Pacific/Gambier',
+  'Pacific/Guadalcanal', 'Pacific/Guam', 'Pacific/Honolulu',
+  'Pacific/Kiritimati', 'Pacific/Marquesas', 'Pacific/Noumea',
+  'Pacific/Pago_Pago', 'Pacific/Palau', 'Pacific/Port_Moresby',
+  'Pacific/Tahiti', 'Pacific/Tarawa', 'Pacific/Tongatapu',
+]
+
 const WEEKEND_KEY = 'wl:showWeekends'
 
 function WeekendToggle() {
@@ -545,6 +605,51 @@ function WeekendToggle() {
   )
 }
 
+function WorkdayAdjustToggle({
+  storageKey,
+  label,
+  description,
+}: {
+  storageKey: string
+  label: string
+  description: string
+}) {
+  const [value, setValue] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const stored = localStorage.getItem(storageKey)
+    return stored === null ? true : stored === 'true'
+  })
+
+  function toggle() {
+    setValue((v) => {
+      const next = !v
+      localStorage.setItem(storageKey, String(next))
+      return next
+    })
+  }
+
+  return (
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-sm font-medium">{label}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{description}</p>
+      </div>
+      <button
+        onClick={toggle}
+        className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
+          value ? 'bg-primary' : 'bg-muted'
+        }`}
+      >
+        <span
+          className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
+            value ? 'translate-x-4' : 'translate-x-1'
+          }`}
+        />
+      </button>
+    </div>
+  )
+}
+
 export default function SettingsPage() {
   const [rules, setRules] = useState<ScheduleRule[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
@@ -559,11 +664,17 @@ export default function SettingsPage() {
   const [oldPassword, setOldPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
   const [passwordMsg, setPasswordMsg] = useState('')
+  const [timezone, setTimezone] = useState('UTC')
+  const [timezoneMsg, setTimezoneMsg] = useState('')
+  const [tzSearch, setTzSearch] = useState('')
 
   useEffect(() => {
     fetch('/api/schedule-rules').then((r) => r.json()).then(setRules).catch(() => {})
     fetch('/api/break-rules').then((r) => r.json()).then(setBreakRules).catch(() => {})
-    fetch('/api/auth/me').then((r) => r.json()).then((u) => setUsername(u.username ?? '')).catch(() => {})
+    fetch('/api/auth/me').then((r) => r.json()).then((u) => {
+      setUsername(u.username ?? '')
+      setTimezone(u.timezone ?? 'UTC')
+    }).catch(() => {})
   }, [])
 
   async function deleteRule(id: string) {
@@ -606,6 +717,18 @@ export default function SettingsPage() {
     const data = await res.json()
     setGeneratingKey(false)
     if (res.ok) setApiKey(data.apiKey)
+  }
+
+  async function changeTimezone(e: React.FormEvent) {
+    e.preventDefault()
+    const res = await fetch('/api/auth/me', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ timezone }),
+    })
+    const data = await res.json()
+    setTimezoneMsg(res.ok ? 'ok' : (data.error ?? 'Error'))
+    if (res.ok) setTimeout(() => setTimezoneMsg(''), 2500)
   }
 
   async function changeUsername(e: React.FormEvent) {
@@ -780,6 +903,26 @@ export default function SettingsPage() {
         <WeekendToggle />
       </section>
 
+      {/* Edición de jornada */}
+      <section className="rounded-lg border border-border bg-card p-6">
+        <h2 className="text-lg font-semibold mb-1">Edición de jornada</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Comportamiento por defecto al modificar el inicio o fin de una jornada. Se puede cambiar por operación.
+        </p>
+        <div className="space-y-4">
+          <WorkdayAdjustToggle
+            storageKey="wl:adjustFirstTask"
+            label="Ajustar 1ª tarea al cambiar hora de inicio"
+            description="Mueve el inicio de la primera tarea del día para que coincida con la nueva hora de inicio de jornada"
+          />
+          <WorkdayAdjustToggle
+            storageKey="wl:adjustLastTask"
+            label="Ajustar última tarea al cambiar hora de fin"
+            description="Mueve el fin de la última tarea del día para que coincida con la nueva hora de cierre de jornada"
+          />
+        </div>
+      </section>
+
       {/* MCP API key */}
       <section className="rounded-lg border border-border bg-card p-6">
         <h2 className="text-lg font-semibold mb-2">Clave API MCP</h2>
@@ -802,6 +945,76 @@ export default function SettingsPage() {
         )}
 
         <McpConfigExamples apiKey={apiKey} />
+      </section>
+
+      {/* Zona horaria */}
+      <section className="rounded-lg border border-border bg-card p-6">
+        <h2 className="text-lg font-semibold mb-1">Zona horaria</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Todas las horas se almacenan en UTC. Esta zona se usa para mostrar y convertir las horas a tu hora local.
+        </p>
+        <form onSubmit={changeTimezone} className="space-y-3">
+          <div>
+            <div className="flex items-center gap-2 mb-2">
+              <label className="block text-xs text-muted-foreground">Zona horaria seleccionada</label>
+              <button
+                type="button"
+                onClick={() => {
+                  const detected = Intl.DateTimeFormat().resolvedOptions().timeZone
+                  setTimezone(detected)
+                  setTzSearch('')
+                }}
+                className="text-xs text-primary hover:underline"
+              >
+                Detectar automáticamente
+              </button>
+            </div>
+            <input
+              type="text"
+              placeholder="Buscar zona horaria…"
+              value={tzSearch || timezone}
+              onChange={(e) => {
+                setTzSearch(e.target.value)
+              }}
+              onFocus={() => setTzSearch(timezone)}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
+            {tzSearch && (
+              <div className="mt-1 rounded-md border border-border bg-popover shadow-lg max-h-48 overflow-auto">
+                {IANA_TIMEZONES
+                  .filter((tz) => tz.toLowerCase().includes(tzSearch.toLowerCase()))
+                  .slice(0, 50)
+                  .map((tz) => (
+                    <button
+                      key={tz}
+                      type="button"
+                      onMouseDown={() => { setTimezone(tz); setTzSearch('') }}
+                      className={`w-full text-left px-3 py-1.5 text-sm hover:bg-accent transition-colors ${tz === timezone ? 'font-medium text-primary' : ''}`}
+                    >
+                      {tz}
+                    </button>
+                  ))
+                }
+                {IANA_TIMEZONES.filter((tz) => tz.toLowerCase().includes(tzSearch.toLowerCase())).length === 0 && (
+                  <p className="px-3 py-2 text-xs text-muted-foreground">Sin resultados</p>
+                )}
+              </div>
+            )}
+          </div>
+          <div className="flex items-center gap-3">
+            <button
+              type="submit"
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+            >
+              Guardar zona horaria
+            </button>
+            {timezoneMsg && (
+              <span className={`text-sm ${timezoneMsg === 'ok' ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
+                {timezoneMsg === 'ok' ? 'Zona horaria guardada' : timezoneMsg}
+              </span>
+            )}
+          </div>
+        </form>
       </section>
 
       {/* Nombre de usuario */}

@@ -13,6 +13,7 @@ export interface Session {
     email: string
     role: 'admin' | 'user'
     isActive: boolean
+    timezone: string
   }
   payload: JwtPayload
 }
@@ -39,6 +40,7 @@ export async function getSession(req?: NextRequest): Promise<Session | null> {
       email: users.email,
       role: users.role,
       isActive: users.isActive,
+      timezone: users.timezone,
     })
     .from(users)
     .where(eq(users.id, payload.sub))
