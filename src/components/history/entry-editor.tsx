@@ -1,11 +1,24 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMinutes, isoToLocalInput } from '@/lib/utils'
 import type { Entry, TaskWithTags } from '@/types/db'
 import { TaskList } from '@/components/dashboard/task-list'
 import { DateTimeInput } from '@/components/ui/date-time-input'
+
+function useAdjustPref(key: string): [boolean, (v: boolean) => void] {
+  const [value, setValue] = useState(true)
+  useEffect(() => {
+    const stored = localStorage.getItem(key)
+    if (stored !== null) setValue(stored === 'true')
+  }, [key])
+  function set(v: boolean) {
+    setValue(v)
+    localStorage.setItem(key, String(v))
+  }
+  return [value, set]
+}
 
 interface EntryEditorProps {
   date: string
@@ -89,6 +102,77 @@ function AddTaskForm({ entryId, onAdded }: { entryId: string; onAdded: () => voi
   )
 }
 
+function WorkdayHoursEditor({ entry }: { entry: Entry }) {
+  const router = useRouter()
+  const [startInput, setStartInput] = useState(isoToLocalInput(entry.startTime ?? ''))
+  const [endInput, setEndInput] = useState(isoToLocalInput(entry.endTime ?? ''))
+  const [adjustFirst, setAdjustFirst] = useAdjustPref('wl:adjustFirstTask')
+  const [adjustLast, setAdjustLast] = useAdjustPref('wl:adjustLastTask')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault()
+    setError('')
+    setSaving(true)
+    const body: Record<string, unknown> = {}
+    if (startInput) { body.startTime = new Date(startInput).toISOString(); body.adjustFirstTask = adjustFirst }
+    if (endInput) { body.endTime = new Date(endInput).toISOString(); body.adjustLastTask = adjustLast }
+    const res = await fetch(`/api/entries/${entry.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    })
+    setSaving(false)
+    if (!res.ok) { setError('Error al guardar'); return }
+    router.refresh()
+  }
+
+  return (
+    <div className="rounded-lg border border-border bg-card p-4">
+      <h2 className="text-sm font-medium mb-3">Horario de jornada</h2>
+      <form onSubmit={save} className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">Inicio</label>
+            <DateTimeInput value={startInput} onChange={setStartInput} />
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer mt-1.5">
+              <input
+                type="checkbox"
+                checked={adjustFirst}
+                onChange={(e) => setAdjustFirst(e.target.checked)}
+                className="rounded"
+              />
+              Mover 1ª tarea
+            </label>
+          </div>
+          <div>
+            <label className="text-xs text-muted-foreground block mb-1">Fin</label>
+            <DateTimeInput value={endInput} onChange={setEndInput} />
+            <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer mt-1.5">
+              <input
+                type="checkbox"
+                checked={adjustLast}
+                onChange={(e) => setAdjustLast(e.target.checked)}
+                className="rounded"
+              />
+              Mover última tarea
+            </label>
+          </div>
+        </div>
+        {error && <p className="text-xs text-destructive">{error}</p>}
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        >
+          {saving ? 'Guardando…' : 'Guardar horario'}
+        </button>
+      </form>
+    </div>
+  )
+}
+
 export function EntryEditor({ date, entry, tasks }: EntryEditorProps) {
   const router = useRouter()
   const [notes, setNotes] = useState(entry?.notes ?? '')
@@ -128,6 +212,8 @@ export function EntryEditor({ date, entry, tasks }: EntryEditorProps) {
 
   return (
     <div className="space-y-4">
+      <WorkdayHoursEditor entry={entry} />
+
       <div className="grid grid-cols-2 gap-4">
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-xs text-muted-foreground">Trabajado</p>

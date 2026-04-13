@@ -4,6 +4,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { getEntryById, updateEntry, deleteEntry } from '@/lib/db/queries/entries'
+import { listTasksForEntry, updateTask } from '@/lib/db/queries/tasks'
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession(_req)
@@ -33,6 +34,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   }
 
   const updated = updateEntry(params.id, updates)
+
+  // Optionally adjust the first/last task to match the new workday boundaries
+  const entryTasks = listTasksForEntry(params.id)
+  if (body.adjustFirstTask && body.startTime && entryTasks.length > 0) {
+    updateTask(entryTasks[0].id, { startTime: body.startTime })
+  }
+  if (body.adjustLastTask && body.endTime && entryTasks.length > 0) {
+    const last = entryTasks[entryTasks.length - 1]
+    updateTask(last.id, { endTime: body.endTime })
+  }
+
   return NextResponse.json(updated)
 }
 

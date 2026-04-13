@@ -6,6 +6,7 @@ import { getSession } from '@/lib/auth/session'
 import { getEntryBreakById, updateEntryBreak, deleteEntryBreak } from '@/lib/db/queries/entry-breaks'
 import { getEntryById } from '@/lib/db/queries/entries'
 import { buildEntryIntervals, detectOverlap, breakToInterval } from '@/lib/business/breaks'
+import { extendPreviousTaskOnBreakDelete } from '@/lib/business/spans'
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession(req)
@@ -46,6 +47,15 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
+  const entry = getEntryById(b.entryId)
+  if (!entry) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  const { startIso, endIso } = breakToInterval(b, entry.date)
+
   deleteEntryBreak(params.id)
+
+  // Extend the task immediately before the break to cover the gap, then auto-merge if same description
+  extendPreviousTaskOnBreakDelete(b.entryId, startIso, endIso)
+
   return NextResponse.json({ ok: true })
 }
