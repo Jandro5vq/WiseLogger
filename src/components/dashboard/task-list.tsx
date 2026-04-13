@@ -123,6 +123,7 @@ function TaskGroup({
   const allTags = Array.from(new Set(segments.flatMap((t) => t.tags)))
   const total = totalMs(segments)
   const spans = segments.length
+  const isActive = segments.some((s) => s.id === activeTaskId)
 
   async function deleteSegment(id: string) {
     await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
@@ -176,14 +177,19 @@ function TaskGroup({
         </div>
 
         <div className="flex items-center gap-1 shrink-0">
-          <button
-            onClick={resume}
-            className="text-xs text-muted-foreground hover:text-primary transition-colors px-1"
-            title="Reanudar tarea"
-          >
-            ▶
-          </button>
-          {spans === 1 && (
+          {isActive && (
+            <span className="text-xs text-green-500 font-medium px-1">en curso</span>
+          )}
+          {!isActive && (
+            <button
+              onClick={resume}
+              className="text-xs text-muted-foreground hover:text-primary transition-colors px-1"
+              title="Reanudar tarea"
+            >
+              ▶
+            </button>
+          )}
+          {spans === 1 && !isActive && (
             <button
               onClick={(e) => { e.stopPropagation(); setEditingId(segments[0].id) }}
               className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1"
@@ -227,16 +233,20 @@ function TaskGroup({
                         ? formatMinutes(
                             (new Date(seg.endTime).getTime() - new Date(seg.startTime).getTime()) / 60000
                           )
-                        : '—'}
+                        : seg.id === activeTaskId
+                          ? <span className="text-green-500">en curso</span>
+                          : '—'}
                     </span>
                   </span>
                   <div className="flex gap-1">
-                    <button
-                      onClick={() => setEditingId(seg.id)}
-                      className="text-xs text-muted-foreground hover:text-foreground px-1"
-                    >
-                      ✎
-                    </button>
+                    {seg.id !== activeTaskId && (
+                      <button
+                        onClick={() => setEditingId(seg.id)}
+                        className="text-xs text-muted-foreground hover:text-foreground px-1"
+                      >
+                        ✎
+                      </button>
+                    )}
                     <button
                       onClick={() => deleteSegment(seg.id)}
                       className="text-xs text-muted-foreground hover:text-destructive px-1"

@@ -103,7 +103,7 @@ export default async function DashboardPage() {
         </div>
         <div className="p-4 space-y-3">
           <TaskList
-            tasks={completedTasks}
+            tasks={allTasksSorted}
             entryId={entry.id}
             activeTaskId={activeTask?.id}
           />
