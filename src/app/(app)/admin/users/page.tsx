@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { ArrowLeft } from 'pixelarticons/react'
 
 interface UserRow {
   id: string
@@ -47,7 +48,10 @@ export default function AdminUsersPage() {
   return (
     <div className="max-w-3xl mx-auto">
       <div className="flex items-center gap-3 mb-6">
-        <button onClick={() => router.back()} className="text-muted-foreground hover:text-foreground">← Back</button>
+        <button onClick={() => router.back()} className="flex items-center gap-1 text-muted-foreground hover:text-foreground">
+          <ArrowLeft width={18} height={18} />
+          Back
+        </button>
         <h1 className="text-2xl font-bold">Users</h1>
       </div>
 

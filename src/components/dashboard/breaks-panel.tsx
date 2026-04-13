@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { TimeInput } from '@/components/ui/time-input'
+import { PenSquare, Cancel, Plus } from 'pixelarticons/react'
 
 interface EntryBreak {
   id: string
@@ -185,9 +186,10 @@ export function BreaksPanel({
         {!showAdd && (
           <button
             onClick={() => setShowAdd(true)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
-            + Añadir pausa
+            <Plus width={14} height={14} />
+            Añadir pausa
           </button>
         )}
       </div>
@@ -219,15 +221,15 @@ export function BreaksPanel({
                 <div className="flex gap-2">
                   <button
                     onClick={() => setEditingId(b.id)}
-                    className="text-xs text-muted-foreground hover:text-foreground"
+                    className="text-muted-foreground hover:text-foreground p-0.5"
                   >
-                    ✎
+                    <PenSquare width={16} height={16} />
                   </button>
                   <button
                     onClick={() => deleteBreak(b.id)}
-                    className="text-xs text-muted-foreground hover:text-destructive"
+                    className="text-muted-foreground hover:text-destructive p-0.5"
                   >
-                    ✕
+                    <Cancel width={16} height={16} />
                   </button>
                 </div>
               </div>

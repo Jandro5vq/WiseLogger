@@ -5,6 +5,7 @@ import { useState } from 'react'
 import { formatMinutes, isoToLocalInput } from '@/lib/utils'
 import type { TaskWithTags } from '@/types/db'
 import { DateTimeInput } from '@/components/ui/date-time-input'
+import { Play, PenSquare, Cancel } from 'pixelarticons/react'
 
 // ─── edit form for a single segment ──────────────────────────────────────────
 
@@ -183,27 +184,27 @@ function TaskGroup({
           {!isActive && (
             <button
               onClick={resume}
-              className="text-xs text-muted-foreground hover:text-primary transition-colors px-1"
+              className="text-muted-foreground hover:text-primary transition-colors p-0.5"
               title="Reanudar tarea"
             >
-              ▶
+              <Play width={16} height={16} />
             </button>
           )}
           {spans === 1 && !isActive && (
             <button
               onClick={(e) => { e.stopPropagation(); setEditingId(segments[0].id) }}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors px-1"
+              className="text-muted-foreground hover:text-foreground transition-colors p-0.5"
               title="Editar"
             >
-              ✎
+              <PenSquare width={16} height={16} />
             </button>
           )}
           <button
             onClick={(e) => { e.stopPropagation(); deleteAll() }}
-            className="text-xs text-muted-foreground hover:text-destructive transition-colors px-1"
+            className="text-muted-foreground hover:text-destructive transition-colors p-0.5"
             title="Eliminar"
           >
-            ✕
+            <Cancel width={16} height={16} />
           </button>
         </div>
       </div>
@@ -242,16 +243,16 @@ function TaskGroup({
                     {seg.id !== activeTaskId && (
                       <button
                         onClick={() => setEditingId(seg.id)}
-                        className="text-xs text-muted-foreground hover:text-foreground px-1"
+                        className="text-muted-foreground hover:text-foreground p-0.5"
                       >
-                        ✎
+                        <PenSquare width={15} height={15} />
                       </button>
                     )}
                     <button
                       onClick={() => deleteSegment(seg.id)}
-                      className="text-xs text-muted-foreground hover:text-destructive px-1"
+                      className="text-muted-foreground hover:text-destructive p-0.5"
                     >
-                      ✕
+                      <Cancel width={15} height={15} />
                     </button>
                   </div>
                 </div>

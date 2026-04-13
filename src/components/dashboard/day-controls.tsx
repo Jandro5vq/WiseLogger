@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { isoToLocalInput } from '@/lib/utils'
 import { DateTimeInput } from '@/components/ui/date-time-input'
+import { PenSquare } from 'pixelarticons/react'
 
 interface DayControlsProps {
   entryId: string
@@ -165,10 +166,10 @@ export function DayControls({
               </button>
               <button
                 onClick={openStartEdit}
-                className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+                className="text-muted-foreground/60 hover:text-muted-foreground transition-colors p-0.5"
                 title="Editar hora de inicio"
               >
-                ✎
+                <PenSquare width={16} height={16} />
               </button>
               <span className="flex-1" />
               <span className="text-xs bg-muted rounded px-2 py-0.5">Jornada cerrada</span>

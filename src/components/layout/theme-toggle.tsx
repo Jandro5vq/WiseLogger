@@ -2,6 +2,7 @@
 
 import { useTheme } from 'next-themes'
 import { useEffect, useState } from 'react'
+import { Lightbulb, Moon, Monitor } from 'pixelarticons/react'
 
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme()
@@ -11,9 +12,10 @@ export function ThemeToggle() {
   if (!mounted) return null
 
   const themes = ['light', 'dark', 'system'] as const
-  const icons = { light: '☀️', dark: '🌙', system: '💻' }
+  const Icons = { light: Lightbulb, dark: Moon, system: Monitor }
   const current = (theme ?? 'system') as 'light' | 'dark' | 'system'
   const next = themes[(themes.indexOf(current) + 1) % themes.length]
+  const Icon = Icons[current]
 
   return (
     <button
@@ -21,7 +23,7 @@ export function ThemeToggle() {
       className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
       title={`Theme: ${current}`}
     >
-      {icons[current]}
+      <Icon width={20} height={20} />
     </button>
   )
 }

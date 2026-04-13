@@ -3,12 +3,13 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { Clock, Calendar, ChartBarBig, SettingsCog, User, Logout } from 'pixelarticons/react'
 
 const navItems = [
-  { href: '/dashboard', label: 'Hoy', icon: '⏱️' },
-  { href: '/history', label: 'Historial', icon: '📅' },
-  { href: '/stats', label: 'Estadísticas', icon: '📊' },
-  { href: '/settings', label: 'Ajustes', icon: '⚙️' },
+  { href: '/dashboard', label: 'Hoy', Icon: Clock },
+  { href: '/history', label: 'Historial', Icon: Calendar },
+  { href: '/stats', label: 'Estadísticas', Icon: ChartBarBig },
+  { href: '/settings', label: 'Ajustes', Icon: SettingsCog },
 ]
 
 export function Sidebar({ isAdmin }: { isAdmin: boolean }) {
@@ -38,7 +39,7 @@ export function Sidebar({ isAdmin }: { isAdmin: boolean }) {
                 : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
             )}
           >
-            <span>{item.icon}</span>
+            <item.Icon width={20} height={20} />
             {item.label}
           </Link>
         ))}
@@ -53,7 +54,7 @@ export function Sidebar({ isAdmin }: { isAdmin: boolean }) {
                 : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
             )}
           >
-            <span>👤</span>
+            <User width={20} height={20} />
             Admin
           </Link>
         )}
@@ -63,7 +64,7 @@ export function Sidebar({ isAdmin }: { isAdmin: boolean }) {
         onClick={handleLogout}
         className="flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
       >
-        <span>🚪</span>
+        <Logout width={20} height={20} />
         Cerrar sesión
       </button>
     </aside>
