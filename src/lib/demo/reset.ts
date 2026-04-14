@@ -69,7 +69,6 @@ function workdaysBack(count: number): string[] {
   const result: string[] = []
   const cursor = new Date()
   cursor.setUTCHours(0, 0, 0, 0)
-  cursor.setUTCDate(cursor.getUTCDate() - 1) // start from yesterday
 
   while (result.length < count) {
     const dow = cursor.getUTCDay() // 0=Sun, 6=Sat
