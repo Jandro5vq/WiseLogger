@@ -307,6 +307,7 @@ export function DayControls({
             </div>
           ) : (
             <button
+              data-tour="close-day"
               onClick={() => setConfirmClose(true)}
               className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
             >

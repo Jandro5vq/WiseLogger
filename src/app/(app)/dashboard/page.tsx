@@ -115,7 +115,7 @@ export default async function DashboardPage() {
 
       <BreaksPanel entryId={entry.id} entryDate={today} initialBreaks={breaks} />
 
-      <div className="rounded-lg border border-border bg-card">
+      <div data-tour="tasks-panel" className="rounded-lg border border-border bg-card">
         <div className="border-b border-border px-4 py-3">
           <h2 className="text-sm font-medium">Tareas</h2>
         </div>

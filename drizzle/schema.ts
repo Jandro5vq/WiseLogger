@@ -10,6 +10,7 @@ export const users = sqliteTable('users', {
   isActive: integer('is_active', { mode: 'boolean' }).notNull().default(true),
   timezone: text('timezone').notNull().default('UTC'), // IANA timezone identifier
   validSince: text('valid_since').notNull().default('1970-01-01T00:00:00.000Z'), // invalidates tokens issued before this
+  onboardingResetAt: text('onboarding_reset_at'), // when non-null, clients with an older wl:onboarded timestamp re-run the tour
   createdAt: text('created_at').notNull(),
   lastLoginAt: text('last_login_at'),
 })

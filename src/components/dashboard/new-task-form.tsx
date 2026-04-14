@@ -100,6 +100,7 @@ export function NewTaskForm({ entryId, activeTaskId, defaultStartTime }: NewTask
   if (!open) {
     return (
       <button
+        data-tour="new-task"
         onClick={openForm}
         className="w-full rounded-lg border-2 border-dashed border-border hover:border-primary/50 py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
       >
@@ -109,7 +110,7 @@ export function NewTaskForm({ entryId, activeTaskId, defaultStartTime }: NewTask
   }
 
   return (
-    <form onSubmit={handleSubmit} className="rounded-lg border border-border bg-card p-4 space-y-3">
+    <form data-tour="new-task" onSubmit={handleSubmit} className="rounded-lg border border-border bg-card p-4 space-y-3">
       <div className="relative">
         <input
           type="text"

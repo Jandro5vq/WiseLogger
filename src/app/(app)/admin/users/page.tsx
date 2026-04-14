@@ -17,6 +17,7 @@ export default function AdminUsersPage() {
   const router = useRouter()
   const [users, setUsers] = useState<UserRow[]>([])
   const [resetResult, setResetResult] = useState<Record<string, string>>({})
+  const [onboardingResetMsg, setOnboardingResetMsg] = useState<Record<string, string>>({})
 
   useEffect(() => {
     fetch('/api/admin/users')
@@ -34,6 +35,13 @@ export default function AdminUsersPage() {
     const data = await res.json()
     if (res.ok) {
       setUsers((prev) => prev.map((u) => (u.id === id ? { ...u, isActive: data.isActive } : u)))
+    }
+  }
+
+  async function resetOnboarding(id: string) {
+    const res = await fetch(`/api/admin/users/${id}/reset-onboarding`, { method: 'POST' })
+    if (res.ok) {
+      setOnboardingResetMsg((prev) => ({ ...prev, [id]: 'Tutorial reactivado' }))
     }
   }
 
@@ -96,6 +104,17 @@ export default function AdminUsersPage() {
                       <code className="text-xs bg-muted px-1.5 py-0.5 rounded select-all">
                         {resetResult[user.id]}
                       </code>
+                    )}
+                    <button
+                      onClick={() => resetOnboarding(user.id)}
+                      className="text-xs underline text-muted-foreground hover:text-foreground"
+                    >
+                      Reset tutorial
+                    </button>
+                    {onboardingResetMsg[user.id] && (
+                      <span className="text-xs text-muted-foreground">
+                        {onboardingResetMsg[user.id]}
+                      </span>
                     )}
                   </div>
                 </td>

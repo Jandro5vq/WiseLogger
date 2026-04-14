@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { formatMinutes } from '@/lib/utils'
 import { TimeInput } from '@/components/ui/time-input'
 
@@ -651,6 +652,8 @@ function WorkdayAdjustToggle({
 }
 
 export default function SettingsPage() {
+  const router = useRouter()
+  const [userId, setUserId] = useState('')
   const [rules, setRules] = useState<ScheduleRule[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -674,6 +677,7 @@ export default function SettingsPage() {
     fetch('/api/auth/me').then((r) => r.json()).then((u) => {
       setUsername(u.username ?? '')
       setTimezone(u.timezone ?? 'UTC')
+      setUserId(u.id ?? '')
     }).catch(() => {})
   }, [])
 
@@ -895,6 +899,24 @@ export default function SettingsPage() {
             onCancel={() => setShowAddBreak(false)}
           />
         )}
+      </section>
+
+      {/* Tutorial */}
+      <section className="rounded-lg border border-border bg-card p-6">
+        <h2 className="text-lg font-semibold mb-1">Tutorial</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Vuelve a ver la guía interactiva con los conceptos básicos de WiseLogger.
+        </p>
+        <button
+          onClick={() => {
+            if (userId) localStorage.removeItem(`wl:onboarded:${userId}`)
+            window.dispatchEvent(new Event('wl:start-tour'))
+            router.push('/dashboard')
+          }}
+          className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent transition-colors"
+        >
+          Rehacer tutorial
+        </button>
       </section>
 
       {/* Calendario */}
