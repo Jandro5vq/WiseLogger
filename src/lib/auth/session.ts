@@ -41,12 +41,18 @@ export async function getSession(req?: NextRequest): Promise<Session | null> {
       role: users.role,
       isActive: users.isActive,
       timezone: users.timezone,
+      validSince: users.validSince,
     })
     .from(users)
     .where(eq(users.id, payload.sub))
     .get()
 
   if (!user || !user.isActive) return null
+
+  // Revocation check: reject tokens issued before validSince
+  if (payload.iat != null && new Date(payload.iat * 1000) < new Date(user.validSince)) {
+    return null
+  }
 
   return { user, payload }
 }
