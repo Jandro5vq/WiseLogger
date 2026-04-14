@@ -12,6 +12,8 @@ import { DayTimeline } from '@/components/dashboard/day-timeline'
 import { BreaksPanel } from '@/components/dashboard/breaks-panel'
 import { DailyNotes } from '@/components/dashboard/daily-notes'
 import { listEntries, updateEntry } from '@/lib/db/queries/entries'
+import { autoSplitActiveTask } from '@/lib/business/spans'
+import { breakToInterval } from '@/lib/business/breaks'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,6 +35,10 @@ export default async function DashboardPage() {
 
   // Auto-create entry so we always have an entryId available
   const entry = autoCreateEntry(session.user.id, today)
+
+  // Auto-split active task if it has run into a break while the page was away
+  autoSplitActiveTask(entry.id, session.user.id, today)
+
   const rawTasks = listTasksForEntry(entry.id)
   const tasks = rawTasks.map(parseTaskTags)
   // Raw task durations (no break subtraction) for the "Tiempo en tareas" display.
@@ -41,6 +47,7 @@ export default async function DashboardPage() {
     .filter((t) => t.endTime)
     .reduce((sum, t) => sum + (new Date(t.endTime!).getTime() - new Date(t.startTime).getTime()) / 60_000, 0)
   const breaks = getEntryBreaks(entry.id)
+  const breakIntervals = breaks.map((b) => breakToInterval(b, today))
   const totalBreakMinutes = getTotalBreakMinutes(entry.id)
   const activeTask = tasks.find((t) => !t.endTime)
   const completedTasks = tasks.filter((t) => t.endTime)
@@ -91,7 +98,14 @@ export default async function DashboardPage() {
         activeTaskStartTime={activeTask?.startTime}
       />
 
-      {activeTask && <ActiveTaskTimer task={activeTask} loadedDate={today} />}
+      {activeTask && (
+        <ActiveTaskTimer
+          task={activeTask}
+          loadedDate={today}
+          entryId={entry.id}
+          breaks={breakIntervals}
+        />
+      )}
 
       <DayTimeline tasks={allTasksSorted} breaks={breaks} entryDate={today} />
 

@@ -1,5 +1,7 @@
 import { v4 as uuidv4 } from 'uuid'
 import { listTasksForEntry, updateTask, deleteTask, createTask } from '@/lib/db/queries/tasks'
+import { getEntryBreaks } from '@/lib/db/queries/entry-breaks'
+import { breakToInterval } from '@/lib/business/breaks'
 
 /**
  * Splits/trims/deletes tasks that overlap with a newly added break interval.
@@ -63,6 +65,52 @@ export function splitTasksAroundBreak(
   }
 
   return { updatedTaskIds, createdTaskIds, deletedTaskIds }
+}
+
+/**
+ * Called on dashboard page load. If the active task (endTime IS NULL) overlaps
+ * one or more breaks that have already started, it is split automatically:
+ *   – stops the task at each breakStart
+ *   – if the break has already ended, creates a new active task from breakEnd
+ *     with the same description and tags
+ *
+ * Returns true when any split was performed.
+ */
+export function autoSplitActiveTask(
+  entryId: string,
+  userId: string,
+  entryDate: string
+): boolean {
+  const now = Date.now()
+  const allTasks = listTasksForEntry(entryId)
+  let current = allTasks.find((t) => !t.endTime)
+  if (!current) return false
+
+  const breaks = getEntryBreaks(entryId)
+  const relevantBreaks = breaks
+    .map((b) => breakToInterval(b, entryDate))
+    .filter(({ startIso }) => {
+      const ms = new Date(startIso).getTime()
+      return ms > new Date(current!.startTime).getTime() && ms <= now
+    })
+    .sort((a, b) => new Date(a.startIso).getTime() - new Date(b.startIso).getTime())
+
+  if (relevantBreaks.length === 0) return false
+
+  for (const { startIso, endIso } of relevantBreaks) {
+    const { description, tags } = current! // capture before stopping
+    updateTask(current!.id, { endTime: startIso })
+    current = undefined
+
+    if (new Date(endIso).getTime() <= now) {
+      // Break has already ended → resume with a new active task
+      current = createTask({ id: uuidv4(), entryId, userId, startTime: endIso, description, tags })
+    } else {
+      break // break is still ongoing, no new active task yet
+    }
+  }
+
+  return true
 }
 
 /**

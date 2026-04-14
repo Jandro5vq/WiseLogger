@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatElapsed, todayISO, isoToLocalInput } from '@/lib/utils'
 import { DateTimeInput } from '@/components/ui/date-time-input'
@@ -10,9 +10,11 @@ import type { TaskWithTags } from '@/types/db'
 interface ActiveTaskTimerProps {
   task: TaskWithTags
   loadedDate: string
+  entryId: string
+  breaks: { startIso: string; endIso: string }[]
 }
 
-export function ActiveTaskTimer({ task, loadedDate }: ActiveTaskTimerProps) {
+export function ActiveTaskTimer({ task, loadedDate, entryId, breaks }: ActiveTaskTimerProps) {
   const router = useRouter()
   const [elapsedMs, setElapsedMs] = useState(0)
   const [stopping, setStopping] = useState(false)
@@ -23,14 +25,50 @@ export function ActiveTaskTimer({ task, loadedDate }: ActiveTaskTimerProps) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // Break-handling state – use refs to avoid stale closures inside setInterval
+  const [breakDisplay, setBreakDisplay] = useState<{ startIso: string; endIso: string } | null>(null)
+  const inBreakRef = useRef<{ startIso: string; endIso: string } | null>(null)
+  const splitFiredRef = useRef(false)
+  const resumingRef = useRef(false)
+  const breaksRef = useRef(breaks)
+  useEffect(() => { breaksRef.current = breaks }, [breaks])
+
   useEffect(() => {
     function tick() {
-      setElapsedMs(Date.now() - new Date(task.startTime).getTime())
+      const now = Date.now()
+
+      // ── In-break mode: show countdown, resume when break ends ──────────────
+      if (inBreakRef.current) {
+        const remaining = Math.max(0, new Date(inBreakRef.current.endIso).getTime() - now)
+        setElapsedMs(remaining)
+        if (remaining === 0 && !resumingRef.current) {
+          resumingRef.current = true
+          resumeAfterBreak(inBreakRef.current.endIso)
+        }
+        return
+      }
+
+      // ── Normal mode: detect when a break has started ────────────────────────
+      if (!splitFiredRef.current) {
+        const hit = breaksRef.current.find((b) => {
+          const bStart = new Date(b.startIso).getTime()
+          return bStart > new Date(task.startTime).getTime() && bStart <= now
+        })
+        if (hit) {
+          splitFiredRef.current = true
+          splitAtBreak(hit)
+          return
+        }
+      }
+
+      setElapsedMs(now - new Date(task.startTime).getTime())
       if (todayISO() !== loadedDate) router.refresh()
     }
+
     tick()
     const id = setInterval(tick, 1000)
     return () => clearInterval(id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [task.startTime, loadedDate, router])
 
   useEffect(() => {
@@ -38,6 +76,25 @@ export function ActiveTaskTimer({ task, loadedDate }: ActiveTaskTimerProps) {
     window.addEventListener('wl:stop-task', handleStop)
     return () => window.removeEventListener('wl:stop-task', handleStop)
   })
+
+  async function splitAtBreak(b: { startIso: string; endIso: string }) {
+    await fetch(`/api/tasks/${task.id}/stop`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endTime: b.startIso }),
+    })
+    inBreakRef.current = b
+    setBreakDisplay(b)
+  }
+
+  async function resumeAfterBreak(startTime: string) {
+    await fetch(`/api/entries/${entryId}/tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description: task.description, tags: task.tags, startTime }),
+    })
+    router.refresh()
+  }
 
   async function stopTask() {
     setStopping(true)
@@ -70,6 +127,37 @@ export function ActiveTaskTimer({ task, loadedDate }: ActiveTaskTimerProps) {
     router.refresh()
   }
 
+  // ── In-break UI ─────────────────────────────────────────────────────────────
+  if (breakDisplay) {
+    return (
+      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 mb-4">
+        <div className="flex items-center justify-between">
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2">
+              <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+              <span className="text-sm font-medium">En pausa</span>
+            </div>
+            <p className="text-base font-semibold mt-1 truncate" title={task.description}>
+              {task.description}
+            </p>
+            {task.tags.length > 0 && (
+              <div className="flex gap-1 mt-1 flex-wrap">
+                {task.tags.map((tag) => (
+                  <span key={tag} className="text-xs bg-secondary rounded px-1.5 py-0.5">{tag}</span>
+                ))}
+              </div>
+            )}
+          </div>
+          <div className="text-right shrink-0 ml-4">
+            <p className="text-xs text-muted-foreground">Reanuda en</p>
+            <p className="text-2xl font-mono font-bold tabular-nums">{formatElapsed(elapsedMs)}</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // ── Normal running UI ────────────────────────────────────────────────────────
   return (
     <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 mb-4">
       <div className="flex items-center justify-between">
