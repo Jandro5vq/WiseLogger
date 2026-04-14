@@ -114,6 +114,28 @@ export function autoSplitActiveTask(
 }
 
 /**
+ * Called just before creating a new task. If an existing completed task spans
+ * across newStartIso, truncates it so its endTime = newStartIso.
+ *
+ * Returns true if a preceding task was adjusted, false if nothing changed.
+ * Does NOT touch breaks — the caller should check for a preceding break
+ * separately and reject if one is found.
+ */
+export function adjustPrecedingTask(entryId: string, newStartIso: string): boolean {
+  const newStart = new Date(newStartIso).getTime()
+
+  const tasks = listTasksForEntry(entryId)
+  const precedingTask = tasks.find((t) => {
+    if (!t.endTime) return false
+    return new Date(t.startTime).getTime() < newStart && new Date(t.endTime).getTime() > newStart
+  })
+  if (!precedingTask) return false
+
+  updateTask(precedingTask.id, { endTime: newStartIso })
+  return true
+}
+
+/**
  * When a break is deleted, extends the task immediately before the break
  * to cover the break's duration. If that extended task is now consecutive
  * with a span of the same description, they are merged into one.
