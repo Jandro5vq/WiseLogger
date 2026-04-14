@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 'use strict'
 
-const path = require('path')
 const crypto = require('crypto')
 
 const dbPath = process.env.DB_PATH || '/data/wiselogger.db'
@@ -18,12 +17,12 @@ if (existing) {
   process.exit(0)
 }
 
-const bcryptjs = require('bcryptjs')
 const { v4: uuidv4 } = require('uuid')
 
 const demoId = uuidv4()
 const now = new Date().toISOString()
-const passwordHash = bcryptjs.hashSync('demo1234', 10)
+// Pre-computed bcrypt hash for 'demo1234' (cost 10) — password is intentionally public
+const passwordHash = '$2a$10$YpDTkRRzE6tIIsMcDpyYXu7NFLuHB9mKzlzljk/.ZSXnfE.pJ2QWW'
 
 // Generate MCP API key for demo user
 const rawApiKey = 'wl_' + crypto.randomBytes(32).toString('hex')
