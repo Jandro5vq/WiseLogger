@@ -5,6 +5,7 @@ export interface JwtPayload {
   sub: string // user id
   username: string
   role: 'admin' | 'user'
+  iat?: number
 }
 
 function getSecret(): Uint8Array {
@@ -27,6 +28,7 @@ export async function verifyToken(token: string): Promise<JwtPayload | null> {
       sub: payload.sub as string,
       username: payload.username as string,
       role: payload.role as 'admin' | 'user',
+      iat: payload.iat,
     }
   } catch {
     return null

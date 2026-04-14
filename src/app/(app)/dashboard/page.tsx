@@ -1,5 +1,5 @@
 import { getSession } from '@/lib/auth/session'
-import { listTasksForEntry } from '@/lib/db/queries/tasks'
+import { listTasksForEntry, updateTask } from '@/lib/db/queries/tasks'
 import { autoCreateEntry, todayDateString } from '@/lib/business/tasks'
 import { getEntryBreaks, getTotalBreakMinutes } from '@/lib/db/queries/entry-breaks'
 import { parseTaskTags } from '@/types/db'
@@ -21,7 +21,7 @@ export default async function DashboardPage() {
   const session = await getSession()
   if (!session) return null
 
-  const today = todayDateString()
+  const today = todayDateString(session.user.timezone)
 
   // Auto-close any unclosed entries from previous days
   const allEntries = listEntries(session.user.id, undefined, today)
@@ -29,7 +29,11 @@ export default async function DashboardPage() {
     if (e.date < today && !e.endTime && e.startTime) {
       const breakMins = getTotalBreakMinutes(e.id)
       const endMs = new Date(e.startTime).getTime() + (e.expectedMinutes + breakMins) * 60_000
-      updateEntry(e.id, { endTime: new Date(endMs).toISOString() })
+      const autoEndTime = new Date(endMs).toISOString()
+      updateEntry(e.id, { endTime: autoEndTime })
+      for (const t of listTasksForEntry(e.id).filter((t) => !t.endTime)) {
+        updateTask(t.id, { endTime: autoEndTime })
+      }
     }
   }
 

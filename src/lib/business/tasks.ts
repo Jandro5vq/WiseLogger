@@ -26,6 +26,6 @@ export function autoCreateEntry(userId: string, date: string) {
   return entry
 }
 
-export function todayDateString(): string {
-  return new Date().toISOString().split('T')[0]
+export function todayDateString(timezone = 'UTC'): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: timezone }).format(new Date())
 }

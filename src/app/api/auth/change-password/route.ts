@@ -26,7 +26,7 @@ export async function POST(req: NextRequest) {
   if (!valid) return NextResponse.json({ error: 'Current password is incorrect' }, { status: 401 })
 
   const passwordHash = await hashPassword(newPassword)
-  updateUser(session.user.id, { passwordHash })
+  updateUser(session.user.id, { passwordHash, validSince: new Date().toISOString() })
 
   return NextResponse.json({ ok: true })
 }

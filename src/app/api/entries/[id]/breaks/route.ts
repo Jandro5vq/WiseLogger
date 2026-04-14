@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { getSession } from '@/lib/auth/session'
 import { getEntryById } from '@/lib/db/queries/entries'
 import { getEntryBreaks, createEntryBreak } from '@/lib/db/queries/entry-breaks'
-import { breakToInterval } from '@/lib/business/breaks'
+import { breakToInterval, detectOverlap } from '@/lib/business/breaks'
 import { splitTasksAroundBreak } from '@/lib/business/spans'
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -38,6 +38,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   const { startIso, endIso } = breakToInterval({ breakStart, durationMinutes }, entry.date)
+
+  const candidate = { start: new Date(startIso).getTime(), end: new Date(endIso).getTime() }
+  const breakOnlyIntervals = getEntryBreaks(params.id).map((b) => {
+    const { startIso: s, endIso: e } = breakToInterval(b, entry.date)
+    return { start: new Date(s).getTime(), end: new Date(e).getTime() }
+  })
+  if (detectOverlap(breakOnlyIntervals, candidate)) {
+    return NextResponse.json({ error: 'La pausa se solapa con otra existente' }, { status: 409 })
+  }
 
   const b = createEntryBreak({
     id: uuidv4(),

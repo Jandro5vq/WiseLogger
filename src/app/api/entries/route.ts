@@ -32,14 +32,20 @@ export async function POST(req: NextRequest) {
   if (existing) return NextResponse.json({ error: 'Entry already exists for this date' }, { status: 409 })
 
   const expectedMinutes = resolveExpectedMinutes(session.user.id, date)
-  const entry = createEntry({
-    id: uuidv4(),
-    userId: session.user.id,
-    date,
-    startTime: new Date().toISOString(),
-    expectedMinutes,
-    notes,
-  })
-
-  return NextResponse.json(entry, { status: 201 })
+  try {
+    const entry = createEntry({
+      id: uuidv4(),
+      userId: session.user.id,
+      date,
+      startTime: new Date().toISOString(),
+      expectedMinutes,
+      notes,
+    })
+    return NextResponse.json(entry, { status: 201 })
+  } catch (e: unknown) {
+    if (e instanceof Error && e.message.includes('UNIQUE constraint')) {
+      return NextResponse.json({ error: 'Entry already exists for this date' }, { status: 409 })
+    }
+    throw e
+  }
 }

@@ -4,10 +4,15 @@ import { getEntryByDate, getEntryById, updateEntry, listEntries } from '@/lib/db
 import { getActiveTask, createTask, updateTask, deleteTask, getTaskById, listTasksForEntry } from '@/lib/db/queries/tasks'
 import { getEntryBreakById, createEntryBreak, updateEntryBreak, deleteEntryBreak, getEntryBreaks } from '@/lib/db/queries/entry-breaks'
 import { autoCreateEntry, todayDateString } from '@/lib/business/tasks'
+import { getUserById } from '@/lib/db/queries/users'
 import { computeBalance, computeEntryWorkedMinutes } from '@/lib/business/balance'
 import { buildEntryIntervals, detectOverlap, breakToInterval } from '@/lib/business/breaks'
 import { parseTaskTags } from '@/types/db'
 import { formatMinutes } from '@/lib/utils'
+
+function getUserToday(userId: string): string {
+  return todayDateString(getUserById(userId)?.timezone ?? 'UTC')
+}
 
 export interface McpTool {
   name: string
@@ -23,7 +28,7 @@ export const mcpTools: McpTool[] = [
     description: 'Obtiene el resumen completo del día de hoy: tiempo trabajado, esperado, balance y lista de tareas.',
     schema: z.object({}),
     execute: (_args, userId) => {
-      const today = todayDateString()
+      const today = getUserToday(userId)
       return getDaySummary(userId, today)
     },
   },
@@ -54,7 +59,7 @@ export const mcpTools: McpTool[] = [
     }),
     execute: (args, userId) => {
       const { from, to } = args as { from?: string; to?: string }
-      const today = todayDateString()
+      const today = getUserToday(userId)
       const all = listEntries(userId, from ?? '2000-01-01', to ?? today)
       return all.map((e) => ({
         date: e.date,
@@ -77,7 +82,7 @@ export const mcpTools: McpTool[] = [
     }),
     execute: (args, userId) => {
       const { date, start_time } = args as { date?: string; start_time?: string }
-      const targetDate = date ?? todayDateString()
+      const targetDate = date ?? getUserToday(userId)
       const entry = autoCreateEntry(userId, targetDate)
       if (start_time) {
         const existing = getEntryByDate(userId, targetDate)
@@ -100,12 +105,16 @@ export const mcpTools: McpTool[] = [
     }),
     execute: (args, userId) => {
       const { date, end_time } = args as { date?: string; end_time?: string }
-      const targetDate = date ?? todayDateString()
+      const targetDate = date ?? getUserToday(userId)
       const entry = getEntryByDate(userId, targetDate)
       if (!entry) return { error: `No hay jornada registrada para ${targetDate}` }
       if (entry.endTime) return { error: 'La jornada ya está cerrada', date: targetDate }
 
-      const updated = updateEntry(entry.id, { endTime: end_time ?? new Date().toISOString() })
+      const closeTime = end_time ?? new Date().toISOString()
+      for (const t of listTasksForEntry(entry.id).filter((t) => !t.endTime)) {
+        updateTask(t.id, { endTime: closeTime })
+      }
+      const updated = updateEntry(entry.id, { endTime: closeTime })
       return { message: 'Jornada cerrada', date: targetDate, endTime: updated?.endTime }
     },
   },
@@ -133,8 +142,8 @@ export const mcpTools: McpTool[] = [
         end_time?: string
       }
 
-      const targetDate = date ?? todayDateString()
-      const isToday = targetDate === todayDateString()
+      const targetDate = date ?? getUserToday(userId)
+      const isToday = targetDate === getUserToday(userId)
 
       if (isToday && !end_time) {
         const active = getActiveTask(userId)
@@ -256,7 +265,7 @@ export const mcpTools: McpTool[] = [
     }),
     execute: (args, userId) => {
       const { date } = args as { date?: string }
-      const targetDate = date ?? todayDateString()
+      const targetDate = date ?? getUserToday(userId)
       const entry = getEntryByDate(userId, targetDate)
       if (!entry) return { error: `No hay jornada registrada para ${targetDate}` }
       return getEntryBreaks(entry.id)
@@ -280,7 +289,7 @@ export const mcpTools: McpTool[] = [
         label?: string
       }
 
-      const targetDate = date ?? todayDateString()
+      const targetDate = date ?? getUserToday(userId)
       const entry = autoCreateEntry(userId, targetDate)
 
       const { startIso, endIso } = breakToInterval({ breakStart: break_start, durationMinutes: duration_minutes }, targetDate)

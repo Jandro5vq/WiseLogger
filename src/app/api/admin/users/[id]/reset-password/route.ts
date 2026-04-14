@@ -19,7 +19,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
 
   const tempPassword = crypto.randomBytes(8).toString('hex') // 16-char hex
   const passwordHash = await hashPassword(tempPassword)
-  updateUser(params.id, { passwordHash })
+  updateUser(params.id, { passwordHash, validSince: new Date().toISOString() })
 
   return NextResponse.json({ tempPassword })
 }
