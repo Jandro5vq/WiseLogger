@@ -9,6 +9,106 @@ interface TaskDef {
   minutes: number
 }
 
+interface BreakWindow {
+  start: Date
+  end: Date
+}
+
+function getBreakWindows(dateStr: string): BreakWindow[] {
+  return [
+    { start: new Date(`${dateStr}T11:00:00.000Z`), end: new Date(`${dateStr}T11:15:00.000Z`) },
+    { start: new Date(`${dateStr}T14:00:00.000Z`), end: new Date(`${dateStr}T15:00:00.000Z`) },
+  ]
+}
+
+// If cursor falls inside a break, advance to the break's end
+function skipPastBreaks(cursor: Date, windows: BreakWindow[]): Date {
+  let t = cursor
+  let moved = true
+  while (moved) {
+    moved = false
+    for (const w of windows) {
+      if (t >= w.start && t < w.end) {
+        t = w.end
+        moved = true
+      }
+    }
+  }
+  return t
+}
+
+interface BuiltTask {
+  id: string
+  startTime: Date
+  endTime: Date
+  description: string
+  tags: string[]
+}
+
+// Places theme tasks back-to-back, splitting at break boundaries so no task
+// ever overlaps with a break window. The last task absorbs remaining work minutes.
+function buildTasks(
+  theme: TaskDef[],
+  entryStart: Date,
+  expectedMinutes: number,
+  dateStr: string
+): BuiltTask[] {
+  const windows = getBreakWindows(dateStr)
+  const result: BuiltTask[] = []
+  let cursor = skipPastBreaks(entryStart, windows)
+  let workPlaced = 0
+  let themeIdx = 0
+  let remainingInTask = theme[0].minutes
+
+  while (themeIdx < theme.length) {
+    const isLast = themeIdx === theme.length - 1
+    if (isLast) {
+      remainingInTask = Math.max(15, expectedMinutes - workPlaced)
+    }
+
+    cursor = skipPastBreaks(cursor, windows)
+    const taskStart = cursor
+
+    const nextBreak = windows
+      .filter(w => w.start > cursor)
+      .sort((a, b) => a.start.getTime() - b.start.getTime())[0]
+
+    let taskEnd: Date
+    let advanceTheme = true
+
+    if (nextBreak) {
+      const minsUntilBreak = (nextBreak.start.getTime() - cursor.getTime()) / 60000
+      if (remainingInTask > minsUntilBreak) {
+        // Task crosses into the break: place up to break start, resume after
+        taskEnd = nextBreak.start
+        workPlaced += minsUntilBreak
+        remainingInTask -= minsUntilBreak
+        cursor = nextBreak.end
+        advanceTheme = false
+      } else {
+        taskEnd = new Date(cursor.getTime() + remainingInTask * 60000)
+        workPlaced += remainingInTask
+        cursor = taskEnd
+      }
+    } else {
+      taskEnd = new Date(cursor.getTime() + remainingInTask * 60000)
+      workPlaced += remainingInTask
+      cursor = taskEnd
+    }
+
+    result.push({ id: uuidv4(), startTime: taskStart, endTime: taskEnd, description: theme[themeIdx].description, tags: theme[themeIdx].tags })
+
+    if (advanceTheme) {
+      themeIdx++
+      if (themeIdx < theme.length) {
+        remainingInTask = theme[themeIdx].minutes
+      }
+    }
+  }
+
+  return result
+}
+
 const THEMES: TaskDef[][] = [
   // Theme A — Backend
   [
@@ -117,28 +217,8 @@ export function resetDemoData(userId: string): void {
       const entryId = uuidv4()
       const entryStart = new Date(dateStr + 'T08:45:00.000Z')
 
-      // Build tasks
       const theme = THEMES[dayIndex % 5]
-      const builtTasks: Array<{ id: string; startTime: Date; endTime: Date; description: string; tags: string[] }> = []
-      let cursor = new Date(entryStart)
-
-      for (let i = 0; i < theme.length; i++) {
-        const taskStart = new Date(cursor)
-        let durationMin: number
-
-        if (i === theme.length - 1) {
-          // Last task fills remaining expected time
-          const elapsedMin = (cursor.getTime() - entryStart.getTime()) / 60000
-          durationMin = Math.max(15, expectedMinutes - elapsedMin)
-        } else {
-          durationMin = theme[i].minutes
-        }
-
-        const taskEnd = new Date(taskStart.getTime() + durationMin * 60000)
-        builtTasks.push({ id: uuidv4(), startTime: taskStart, endTime: taskEnd, description: theme[i].description, tags: theme[i].tags })
-        cursor = new Date(taskEnd.getTime() + 5 * 60000) // 5-min gap between tasks
-      }
-
+      const builtTasks = buildTasks(theme, entryStart, expectedMinutes, dateStr)
       const entryEnd = builtTasks[builtTasks.length - 1].endTime
 
       db.insert(entries).values({
