@@ -15,6 +15,7 @@ function run(script) {
 try {
   run('migrate.js')
   run('seed-admin.js')
+  run('seed-demo.js')
 } catch (err) {
   console.error('[start] Startup failed:', err.message)
   process.exit(1)

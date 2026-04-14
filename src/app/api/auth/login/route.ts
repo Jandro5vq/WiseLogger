@@ -9,6 +9,7 @@ import { setAuthCookie } from '@/lib/auth/cookies'
 import { db } from '@/lib/db'
 import { users } from '@db/schema'
 import { eq } from 'drizzle-orm'
+import { resetDemoData } from '@/lib/demo/reset'
 
 export async function POST(req: NextRequest) {
   const body = await req.json()
@@ -35,6 +36,11 @@ export async function POST(req: NextRequest) {
   const valid = await verifyPassword(password, user.passwordHash)
   if (!valid) {
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
+  }
+
+  // Demo user: wipe and re-seed data on every login
+  if (user.username.toLowerCase() === 'demo') {
+    resetDemoData(user.id)
   }
 
   // Update last login
