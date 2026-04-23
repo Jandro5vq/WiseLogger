@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 
 export function CloseDayButton({ disabled }: { disabled: boolean }) {
@@ -8,10 +8,11 @@ export function CloseDayButton({ disabled }: { disabled: boolean }) {
   const [loading, setLoading] = useState(false)
   const [confirming, setConfirming] = useState(false)
 
+  const handleCloseDay = useCallback(() => setConfirming(true), [])
   useEffect(() => {
-    window.addEventListener('wl:close-day', () => setConfirming(true))
-    return () => window.removeEventListener('wl:close-day', () => setConfirming(true))
-  }, [])
+    window.addEventListener('wl:close-day', handleCloseDay)
+    return () => window.removeEventListener('wl:close-day', handleCloseDay)
+  }, [handleCloseDay])
 
   async function closeDay() {
     setLoading(true)

@@ -115,6 +115,7 @@ export function NewTaskForm({ entryId, activeTaskId, defaultStartTime }: NewTask
         <input
           type="text"
           placeholder="Descripción de la tarea"
+          aria-label="Descripción de la tarea"
           required
           autoFocus
           value={description}
@@ -145,12 +146,13 @@ export function NewTaskForm({ entryId, activeTaskId, defaultStartTime }: NewTask
       <input
         type="text"
         placeholder="Etiquetas (separadas por coma)"
+        aria-label="Etiquetas"
         value={tagsInput}
         onChange={(e) => setTagsInput(e.target.value)}
         className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
       />
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div>
           <label className="block text-xs text-muted-foreground mb-1">Hora de inicio</label>
           <DateTimeInput value={startTime} onChange={setStartTime} />

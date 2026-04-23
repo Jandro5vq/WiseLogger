@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useToast } from '@/components/ui/toast'
 import { formatMinutes } from '@/lib/utils'
 import { HoursBarChart } from '@/components/stats/hours-bar-chart'
 import { BalanceLineChart } from '@/components/stats/balance-line-chart'
@@ -18,6 +19,7 @@ export default function StatsPage() {
     cumulativeBalance: number
   } | null>(null)
   const [allDays, setAllDays] = useState<DaySummary[]>([])
+  const toast = useToast()
 
   useEffect(() => {
     const today = new Date().toISOString().split('T')[0]
@@ -36,15 +38,15 @@ export default function StatsPage() {
     fetch(url)
       .then((r) => r.json())
       .then((d) => setData(d))
-      .catch(() => {})
-  }, [period])
+      .catch(() => toast.error('Error al cargar estadísticas'))
+  }, [period, toast])
 
   useEffect(() => {
     fetch('/api/summary/balance')
       .then((r) => r.json())
       .then((d) => setAllDays(d.days ?? []))
-      .catch(() => {})
-  }, [])
+      .catch(() => toast.error('Error al cargar el balance'))
+  }, [toast])
 
   const periodBalance =
     data ? data.totalWorkedMinutes - data.totalExpectedMinutes : 0
@@ -71,7 +73,7 @@ export default function StatsPage() {
       </div>
 
       {data && (
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="rounded-lg border border-border bg-card p-4">
             <p className="text-xs text-muted-foreground">Trabajado</p>
             <p className="text-xl font-bold">{formatMinutes(data.totalWorkedMinutes)}</p>

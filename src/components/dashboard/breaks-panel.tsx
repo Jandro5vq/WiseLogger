@@ -4,6 +4,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { TimeInput } from '@/components/ui/time-input'
 import { PenSquare, Cancel, Plus } from 'pixelarticons/react'
+import { useToast } from '@/components/ui/toast'
 
 interface EntryBreak {
   id: string
@@ -124,6 +125,7 @@ export function BreaksPanel({
   initialBreaks: EntryBreak[]
 }) {
   const router = useRouter()
+  const toast = useToast()
   const [breaks, setBreaks] = useState<EntryBreak[]>(initialBreaks)
   const [showAdd, setShowAdd] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -161,7 +163,8 @@ export function BreaksPanel({
   }
 
   async function deleteBreak(id: string) {
-    await fetch(`/api/breaks/${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/breaks/${id}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Error al eliminar la pausa'); return }
     setBreaks((prev) => prev.filter((b) => b.id !== id))
     router.refresh()
   }
