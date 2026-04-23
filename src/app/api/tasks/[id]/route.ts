@@ -23,6 +23,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if ('startTime' in body) updates.startTime = body.startTime
   if ('endTime' in body) updates.endTime = body.endTime
   if ('tags' in body) updates.tags = JSON.stringify(body.tags)
+  if ('notes' in body) updates.notes = body.notes ?? null
 
   // Validate overlap if time fields changed
   const newStart = (updates.startTime as string | undefined) ?? task.startTime

@@ -6,12 +6,14 @@ import { formatMinutes, isoToLocalInput } from '@/lib/utils'
 import type { TaskWithTags } from '@/types/db'
 import { DateTimeInput } from '@/components/ui/date-time-input'
 import { Play, PenSquare, Cancel } from 'pixelarticons/react'
+import { useToast } from '@/components/ui/toast'
 
 // ─── edit form for a single segment ──────────────────────────────────────────
 
-function EditTaskForm({ task, onDone }: { task: TaskWithTags; onDone: () => void }) {
+function EditTaskForm({ task, onDone, siblingIds }: { task: TaskWithTags; onDone: () => void; siblingIds?: string[] }) {
   const router = useRouter()
   const [description, setDescription] = useState(task.description)
+  const [notes, setNotes] = useState(task.notes ?? '')
   const [tagsInput, setTagsInput] = useState(task.tags.join(', '))
   const [startTime, setStartTime] = useState(isoToLocalInput(task.startTime))
   const [endTime, setEndTime] = useState(task.endTime ? isoToLocalInput(task.endTime) : '')
@@ -29,6 +31,7 @@ function EditTaskForm({ task, onDone }: { task: TaskWithTags; onDone: () => void
       body: JSON.stringify({
         description,
         tags,
+        notes: notes.trim() || null,
         startTime: new Date(startTime).toISOString(),
         endTime: endTime ? new Date(endTime).toISOString() : null,
       }),
@@ -38,6 +41,19 @@ function EditTaskForm({ task, onDone }: { task: TaskWithTags; onDone: () => void
       const data = await res.json()
       setError(data.error ?? 'Error al guardar')
       return
+    }
+    // Propagate notes to sibling spans so they stay in sync
+    const noteVal = notes.trim() || null
+    if (siblingIds && siblingIds.length > 0) {
+      await Promise.all(
+        siblingIds.map((id) =>
+          fetch(`/api/tasks/${id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ notes: noteVal }),
+          })
+        )
+      )
     }
     onDone()
     router.refresh()
@@ -50,6 +66,7 @@ function EditTaskForm({ task, onDone }: { task: TaskWithTags; onDone: () => void
         value={description}
         onChange={(e) => setDescription(e.target.value)}
         required
+        aria-label="Descripción"
         className="w-full rounded border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
       />
       <input
@@ -57,9 +74,18 @@ function EditTaskForm({ task, onDone }: { task: TaskWithTags; onDone: () => void
         value={tagsInput}
         onChange={(e) => setTagsInput(e.target.value)}
         placeholder="Etiquetas (separadas por coma)"
+        aria-label="Etiquetas"
         className="w-full rounded border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
       />
-      <div className="grid grid-cols-2 gap-2">
+      <textarea
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        placeholder="Notas (opcional)"
+        aria-label="Notas"
+        rows={2}
+        className="w-full rounded border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+      />
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div>
           <label className="text-xs text-muted-foreground">Inicio</label>
           <DateTimeInput value={startTime} onChange={setStartTime} required />
@@ -118,21 +144,46 @@ function TaskGroup({
   activeTaskId?: string
 }) {
   const router = useRouter()
+  const toast = useToast()
   const [expanded, setExpanded] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const [editingNotes, setEditingNotes] = useState(false)
+  const [notesValue, setNotesValue] = useState(() => segments.find((s) => s.notes)?.notes ?? '')
+  const [savingNotes, setSavingNotes] = useState(false)
 
   const allTags = Array.from(new Set(segments.flatMap((t) => t.tags)))
   const total = totalMs(segments)
   const spans = segments.length
   const isActive = segments.some((s) => s.id === activeTaskId)
 
+  const groupNotes = segments.find((s) => s.notes)?.notes ?? null
+
+  async function saveGroupNotes() {
+    setSavingNotes(true)
+    const note = notesValue.trim() || null
+    await Promise.all(
+      segments.map((s) =>
+        fetch(`/api/tasks/${s.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes: note }),
+        })
+      )
+    )
+    setSavingNotes(false)
+    setEditingNotes(false)
+    router.refresh()
+  }
+
   async function deleteSegment(id: string) {
-    await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
+    const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
+    if (!res.ok) { toast.error('Error al eliminar la tarea'); return }
     router.refresh()
   }
 
   async function deleteAll() {
-    await Promise.all(segments.map((t) => fetch(`/api/tasks/${t.id}`, { method: 'DELETE' })))
+    const results = await Promise.all(segments.map((t) => fetch(`/api/tasks/${t.id}`, { method: 'DELETE' })))
+    if (results.some((r) => !r.ok)) toast.error('Error al eliminar algunas tareas')
     router.refresh()
   }
 
@@ -147,6 +198,7 @@ function TaskGroup({
       body: JSON.stringify({
         description,
         tags: allTags,
+        notes: groupNotes,
         startTime: new Date().toISOString(),
       }),
     })
@@ -157,6 +209,9 @@ function TaskGroup({
     <div className="rounded-lg border border-border bg-card overflow-hidden">
       {/* summary row — entire row is clickable to expand */}
       <div
+        role={spans > 1 ? 'button' : undefined}
+        tabIndex={spans > 1 ? 0 : undefined}
+        onKeyDown={spans > 1 ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((v) => !v) } } : undefined}
         className="flex items-center justify-between px-3 py-2.5 gap-3 cursor-pointer hover:bg-accent/50 transition-colors"
         onClick={() => { if (spans > 1) setExpanded((v) => !v) }}
       >
@@ -190,6 +245,17 @@ function TaskGroup({
               <Play width={16} height={16} />
             </button>
           )}
+          {!groupNotes && !editingNotes && (
+            <button
+              onClick={(e) => { e.stopPropagation(); setNotesValue(''); setEditingNotes(true) }}
+              className="text-muted-foreground hover:text-foreground transition-colors p-0.5"
+              title="Añadir notas"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
+              </svg>
+            </button>
+          )}
           {spans === 1 && !isActive && (
             <button
               onClick={(e) => { e.stopPropagation(); setEditingId(segments[0].id) }}
@@ -212,7 +278,44 @@ function TaskGroup({
       {/* inline edit for single-segment tasks */}
       {editingId && segments[0].id === editingId && (
         <div className="px-3 pb-3">
-          <EditTaskForm task={segments[0]} onDone={() => setEditingId(null)} />
+          <EditTaskForm task={segments[0]} onDone={() => setEditingId(null)} siblingIds={segments.filter((s) => s.id !== segments[0].id).map((s) => s.id)} />
+        </div>
+      )}
+
+      {/* group-level notes */}
+      {!editingNotes && groupNotes && (
+        <div
+          className="px-4 pb-2 cursor-pointer"
+          onClick={() => { setNotesValue(groupNotes); setEditingNotes(true) }}
+        >
+          <p className="text-xs text-muted-foreground italic whitespace-pre-wrap">{groupNotes}</p>
+        </div>
+      )}
+      {editingNotes && (
+        <div className="px-3 pb-3 space-y-1.5">
+          <textarea
+            value={notesValue}
+            onChange={(e) => setNotesValue(e.target.value)}
+            rows={2}
+            autoFocus
+            placeholder="Notas…"
+            className="w-full rounded border border-input bg-background px-2 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-ring resize-none"
+          />
+          <div className="flex gap-1.5">
+            <button
+              onClick={saveGroupNotes}
+              disabled={savingNotes}
+              className="rounded bg-primary px-2 py-1 text-[10px] font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+            >
+              {savingNotes ? 'Guardando…' : 'Guardar'}
+            </button>
+            <button
+              onClick={() => setEditingNotes(false)}
+              className="rounded border border-border px-2 py-1 text-[10px] hover:bg-accent"
+            >
+              Cancelar
+            </button>
+          </div>
         </div>
       )}
 
@@ -223,7 +326,7 @@ function TaskGroup({
             <div key={seg.id}>
               {editingId === seg.id ? (
                 <div className="px-3 py-2">
-                  <EditTaskForm task={seg} onDone={() => setEditingId(null)} />
+                  <EditTaskForm task={seg} onDone={() => setEditingId(null)} siblingIds={segments.filter((s) => s.id !== seg.id).map((s) => s.id)} />
                 </div>
               ) : (
                 <div className="flex items-center justify-between px-4 py-1.5">

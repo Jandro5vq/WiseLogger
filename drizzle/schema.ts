@@ -45,6 +45,7 @@ export const tasks = sqliteTable('tasks', {
   endTime: text('end_time'), // null = task still active
   description: text('description').notNull(),
   tags: text('tags').notNull().default('[]'), // JSON array stored as TEXT
+  notes: text('notes'),
 })
 
 export const workScheduleRules = sqliteTable('work_schedule_rules', {

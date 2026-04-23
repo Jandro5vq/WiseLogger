@@ -6,6 +6,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { getSession } from '@/lib/auth/session'
 import { getEntryById } from '@/lib/db/queries/entries'
 import { getActiveTask, createTask, updateTask, listTasksForEntry } from '@/lib/db/queries/tasks'
+import { sqlite } from '@/lib/db'
 import { getEntryBreaks } from '@/lib/db/queries/entry-breaks'
 import { parseTaskTags } from '@/types/db'
 import { breakToInterval, buildEntryIntervals, detectOverlap } from '@/lib/business/breaks'
@@ -34,11 +35,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   const body = await req.json()
-  const { description, startTime, endTime, tags } = body as {
+  const { description, startTime, endTime, tags, notes } = body as {
     description: string
     startTime?: string
     endTime?: string
     tags?: string[]
+    notes?: string | null
   }
 
   if (!description) return NextResponse.json({ error: 'La descripción es obligatoria' }, { status: 400 })
@@ -53,17 +55,29 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
   }
 
-  // Reject if startTime falls inside a break (breaks are immutable)
+  // Reject if task overlaps any break (breaks are immutable)
   const entryBreaks = getEntryBreaks(params.id)
-  const insideBreak = entryBreaks.some((b) => {
+  const breakIntervals = entryBreaks.map((b) => {
     const { startIso, endIso } = breakToInterval(b, entry.date)
-    return new Date(startIso).getTime() < tStart && new Date(endIso).getTime() > tStart
+    return { start: new Date(startIso).getTime(), end: new Date(endIso).getTime() }
   })
-  if (insideBreak) {
-    return NextResponse.json(
-      { error: 'La hora de inicio cae dentro de una pausa' },
-      { status: 400 }
-    )
+  if (endTime) {
+    // Completed task: full interval overlap check
+    if (detectOverlap(breakIntervals, { start: tStart, end: new Date(endTime).getTime() })) {
+      return NextResponse.json(
+        { error: 'El intervalo se solapa con una pausa existente' },
+        { status: 400 }
+      )
+    }
+  } else {
+    // Active task: point-in-break check for startTime only
+    const insideBreak = breakIntervals.some((iv) => tStart > iv.start && tStart < iv.end)
+    if (insideBreak) {
+      return NextResponse.json(
+        { error: 'La hora de inicio cae dentro de una pausa' },
+        { status: 400 }
+      )
+    }
   }
 
   // Truncate any preceding completed task that overlaps at the new task's startTime
@@ -80,24 +94,26 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
   }
 
-  // If starting a new active task, auto-stop any existing active task.
-  // Use the new task's startTime as the endTime so there's no gap.
-  if (!endTime) {
-    const active = getActiveTask(session.user.id)
-    if (active) {
-      updateTask(active.id, { endTime: effectiveStart })
+  // Atomic: stop active task + create new one in a transaction to prevent races
+  const task = sqlite.transaction(() => {
+    if (!endTime) {
+      const active = getActiveTask(session.user.id)
+      if (active) {
+        updateTask(active.id, { endTime: effectiveStart })
+      }
     }
-  }
 
-  const task = createTask({
-    id: uuidv4(),
-    entryId: params.id,
-    userId: session.user.id,
-    startTime: effectiveStart,
-    endTime,
-    description,
-    tags: JSON.stringify(tags ?? []),
-  })
+    return createTask({
+      id: uuidv4(),
+      entryId: params.id,
+      userId: session.user.id,
+      startTime: effectiveStart,
+      endTime,
+      description,
+      tags: JSON.stringify(tags ?? []),
+      notes: notes ?? null,
+    })
+  })()
 
   return NextResponse.json(parseTaskTags(task), { status: 201 })
 }
