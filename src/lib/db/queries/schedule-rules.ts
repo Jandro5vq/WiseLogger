@@ -44,6 +44,22 @@ export function createDefaultRules(userId: string) {
       durationMinutes: 420,
       label: 'Horario de verano',
     },
+    {
+      id: uuidv4(),
+      userId,
+      ruleType: 'weekday' as const,
+      weekday: 6, // Saturday
+      durationMinutes: 0,
+      label: 'Sábado',
+    },
+    {
+      id: uuidv4(),
+      userId,
+      ruleType: 'weekday' as const,
+      weekday: 0, // Sunday
+      durationMinutes: 0,
+      label: 'Domingo',
+    },
   ]
   return db.insert(workScheduleRules).values(rules).returning().all()
 }

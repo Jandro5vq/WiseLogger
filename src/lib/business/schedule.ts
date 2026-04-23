@@ -2,11 +2,16 @@ import { getScheduleRules } from '@/lib/db/queries/schedule-rules'
 
 /**
  * Resolves how many minutes are expected for a given user/date.
- * Priority: specific_date > weekday scoped to month > weekday > default
+ * Priority: specific_date > month+weekday > month (any weekday) > weekday > default
  */
 export function resolveExpectedMinutes(userId: string, date: string): number {
   const rules = getScheduleRules(userId)
-  if (rules.length === 0) return 495 // 8h15m fallback
+  if (rules.length === 0) {
+    // Hardcoded fallback when no rules exist at all
+    const day = new Date(date + 'T00:00:00').getDay()
+    if (day === 0 || day === 6) return 0 // weekends
+    return 495 // 8h15m
+  }
 
   const d = new Date(date + 'T00:00:00')
   const weekday = d.getDay() // 0=Sunday … 6=Saturday
