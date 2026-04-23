@@ -3,7 +3,8 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import { useState, useCallback } from 'react'
+import DOMPurify from 'dompurify'
+import { useEffect, useRef, useState, useCallback } from 'react'
 
 interface RecentEntry {
   date: string
@@ -27,7 +28,7 @@ function NotesViewer({ html }: { html: string }) {
   return (
     <div
       className="prose prose-sm dark:prose-invert max-w-none text-xs text-muted-foreground"
-      dangerouslySetInnerHTML={{ __html: html }}
+      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }}
     />
   )
 }
@@ -35,6 +36,9 @@ function NotesViewer({ html }: { html: string }) {
 export function DailyNotes({ entryId, initialNotes, recentEntries }: DailyNotesProps) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout>>()
+
+  useEffect(() => () => { clearTimeout(savedTimerRef.current) }, [])
 
   const save = useCallback(
     async (html: string) => {
@@ -46,7 +50,8 @@ export function DailyNotes({ entryId, initialNotes, recentEntries }: DailyNotesP
       })
       setSaving(false)
       setSaved(true)
-      setTimeout(() => setSaved(false), 2000)
+      clearTimeout(savedTimerRef.current)
+      savedTimerRef.current = setTimeout(() => setSaved(false), 2000)
     },
     [entryId]
   )

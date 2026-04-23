@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserByUsername } from '@/lib/db/queries/users'
-import { verifyPassword, NEEDS_RESET_SENTINEL } from '@/lib/auth/password'
+import { verifyPassword, NEEDS_RESET_SENTINEL, DUMMY_HASH } from '@/lib/auth/password'
 import { signToken } from '@/lib/auth/jwt'
 import { setAuthCookie } from '@/lib/auth/cookies'
 import { db } from '@/lib/db'
@@ -21,6 +21,8 @@ export async function POST(req: NextRequest) {
 
   const user = getUserByUsername(username)
   if (!user) {
+    // Timing-safe: always run bcrypt to prevent username enumeration
+    await verifyPassword(password, DUMMY_HASH)
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })
   }
 

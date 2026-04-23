@@ -12,6 +12,16 @@ function run(script) {
   })
 }
 
+// Eagerly validate required env vars before touching the database
+if (!process.env.SECRET_KEY || process.env.SECRET_KEY.length < 32) {
+  console.error('[start] FATAL: SECRET_KEY is missing or shorter than 32 characters')
+  process.exit(1)
+}
+if (!process.env.ADMIN_EMAIL) {
+  console.error('[start] FATAL: ADMIN_EMAIL is not set')
+  process.exit(1)
+}
+
 try {
   run('migrate.js')
   run('seed-admin.js')

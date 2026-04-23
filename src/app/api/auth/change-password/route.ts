@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { getUserById, updateUser } from '@/lib/db/queries/users'
-import { verifyPassword, hashPassword } from '@/lib/auth/password'
+import { verifyPassword, hashPassword, validatePassword } from '@/lib/auth/password'
 
 export async function POST(req: NextRequest) {
   const session = await getSession(req)
@@ -15,8 +15,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Both passwords are required' }, { status: 400 })
   }
 
-  if (newPassword.length < 8) {
-    return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
+  const pwError = validatePassword(newPassword)
+  if (pwError) {
+    return NextResponse.json({ error: pwError }, { status: 400 })
   }
 
   const user = getUserById(session.user.id)

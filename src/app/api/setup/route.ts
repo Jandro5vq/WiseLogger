@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserById, updateUser } from '@/lib/db/queries/users'
-import { hashPassword, NEEDS_RESET_SENTINEL } from '@/lib/auth/password'
+import { hashPassword, NEEDS_RESET_SENTINEL, validatePassword } from '@/lib/auth/password'
 import { signToken } from '@/lib/auth/jwt'
 import { setAuthCookie } from '@/lib/auth/cookies'
 
@@ -17,8 +17,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'userId and password are required' }, { status: 400 })
   }
 
-  if (password.length < 8) {
-    return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
+  const pwError = validatePassword(password)
+  if (pwError) {
+    return NextResponse.json({ error: pwError }, { status: 400 })
   }
 
   const user = getUserById(userId)
@@ -28,6 +29,12 @@ export async function POST(req: NextRequest) {
 
   if (user.passwordHash !== NEEDS_RESET_SENTINEL) {
     return NextResponse.json({ error: 'Password already set' }, { status: 400 })
+  }
+
+  // S7: Time-box setup — only allow within 24h of account creation
+  const createdAt = new Date(user.createdAt).getTime()
+  if (Date.now() - createdAt > 24 * 60 * 60 * 1000) {
+    return NextResponse.json({ error: 'Setup link expired. Contact an admin.' }, { status: 403 })
   }
 
   const passwordHash = await hashPassword(password)

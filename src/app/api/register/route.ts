@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid'
 import crypto from 'crypto'
 import { getInvitationByToken, markInvitationUsed } from '@/lib/db/queries/invitations'
 import { getUserByUsername, getUserByEmail, createUser } from '@/lib/db/queries/users'
-import { hashPassword } from '@/lib/auth/password'
+import { hashPassword, validatePassword } from '@/lib/auth/password'
 import { createDefaultRules } from '@/lib/db/queries/schedule-rules'
 
 export async function POST(req: NextRequest) {
@@ -22,8 +22,9 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'All fields are required' }, { status: 400 })
   }
 
-  if (password.length < 8) {
-    return NextResponse.json({ error: 'Password must be at least 8 characters' }, { status: 400 })
+  const pwError = validatePassword(password)
+  if (pwError) {
+    return NextResponse.json({ error: pwError }, { status: 400 })
   }
 
   const invitation = getInvitationByToken(token)
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
   markInvitationUsed(token, userId, now)
 
   return NextResponse.json(
-    { message: 'Account created successfully', apiKey: rawApiKey },
+    { message: 'Account created successfully', apiKey: rawApiKey, warning: 'Save this API key now. It cannot be retrieved later.' },
     { status: 201 }
   )
 }
