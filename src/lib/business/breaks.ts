@@ -26,7 +26,8 @@ export function hhmmToUTC(dateStr: string, timeStr: string, timezone: string): s
     // Shift the naive stamp so its local representation equals the desired HH:MM
     const offsetMs = (localH - wantedH) * 3_600_000 + ((p.minute ?? 0) - wantedM) * 60_000
     return new Date(naive.getTime() - offsetMs).toISOString()
-  } catch {
+  } catch (e) {
+    console.error('hhmmToUTC: invalid timezone or date, falling back to server local time', { dateStr, timeStr, timezone }, e)
     return new Date(`${dateStr}T${timeStr}:00`).toISOString()
   }
 }
@@ -49,7 +50,7 @@ export function breakToInterval(
   breakRec: { breakStart: string; durationMinutes: number },
   entryDate: string
 ): { startIso: string; endIso: string } {
-  const isIso = breakRec.breakStart.length > 5
+  const isIso = /^\d{4}-\d{2}-\d{2}T/.test(breakRec.breakStart)
   const startIso = isIso
     ? breakRec.breakStart
     : new Date(`${entryDate}T${breakRec.breakStart}:00`).toISOString()
@@ -100,6 +101,7 @@ export function buildEntryIntervals(
  * Called once when a new entry is created.
  * Applies all matching break rules and seeds entryBreaks records.
  * Break rule times (HH:MM) are converted to UTC ISO using the user's timezone.
+ * Note: break rules are not retroactive — changing rules won't update existing entries.
  */
 export function applyBreakRulesForEntry(
   userId: string,
