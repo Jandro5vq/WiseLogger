@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { listEntries } from '@/lib/db/queries/entries'
-import { listTasksForEntry } from '@/lib/db/queries/tasks'
+import { listTasksForEntries } from '@/lib/db/queries/tasks'
 import { getScheduleRules } from '@/lib/db/queries/schedule-rules'
 import { parseTaskTags } from '@/types/db'
 
@@ -13,9 +13,10 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const allEntries = listEntries(session.user.id)
+  const tasksMap = listTasksForEntries(allEntries.map((e) => e.id))
   const entriesWithTasks = allEntries.map((entry) => ({
     ...entry,
-    tasks: listTasksForEntry(entry.id).map(parseTaskTags),
+    tasks: (tasksMap.get(entry.id) ?? []).map(parseTaskTags),
   }))
 
   const backup = {

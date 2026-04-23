@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
 import { entries } from '@db/schema'
-import { eq, and, gte, lte } from 'drizzle-orm'
+import { eq, and, gte, lte, lt, isNull } from 'drizzle-orm'
 
 export function getEntryById(id: string) {
   return db.select().from(entries).where(eq(entries.id, id)).get()
@@ -43,4 +43,14 @@ export function updateEntry(id: string, data: Partial<typeof entries.$inferInser
 
 export function deleteEntry(id: string) {
   return db.delete(entries).where(eq(entries.id, id)).returning().get()
+}
+
+/** Entries from before `date` that were never closed (no endTime). */
+export function listUnclosedEntriesBefore(userId: string, date: string) {
+  return db
+    .select()
+    .from(entries)
+    .where(and(eq(entries.userId, userId), lt(entries.date, date), isNull(entries.endTime)))
+    .orderBy(entries.date)
+    .all()
 }

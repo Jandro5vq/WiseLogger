@@ -1,6 +1,9 @@
 import { db } from '@/lib/db'
 import { entryBreaks } from '@db/schema'
-import { eq } from 'drizzle-orm'
+import { eq, inArray } from 'drizzle-orm'
+import type { InferSelectModel } from 'drizzle-orm'
+
+type EntryBreak = InferSelectModel<typeof entryBreaks>
 
 export function getEntryBreaks(entryId: string) {
   return db.select().from(entryBreaks).where(eq(entryBreaks.entryId, entryId)).all()
@@ -25,4 +28,17 @@ export function deleteEntryBreak(id: string) {
 export function getTotalBreakMinutes(entryId: string): number {
   const breaks = getEntryBreaks(entryId)
   return breaks.reduce((sum, b) => sum + b.durationMinutes, 0)
+}
+
+/** Batch-fetch breaks for multiple entries in a single query. */
+export function getBreaksForEntries(entryIds: string[]): Map<string, EntryBreak[]> {
+  const map = new Map<string, EntryBreak[]>()
+  if (entryIds.length === 0) return map
+  const rows = db.select().from(entryBreaks).where(inArray(entryBreaks.entryId, entryIds)).all()
+  for (const row of rows) {
+    const list = map.get(row.entryId)
+    if (list) list.push(row)
+    else map.set(row.entryId, [row])
+  }
+  return map
 }

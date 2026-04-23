@@ -1,6 +1,6 @@
 import { listEntries, getEntryById } from '@/lib/db/queries/entries'
-import { listTasksForEntry } from '@/lib/db/queries/tasks'
-import { getEntryBreaks } from '@/lib/db/queries/entry-breaks'
+import { listTasksForEntry, listTasksForEntries } from '@/lib/db/queries/tasks'
+import { getEntryBreaks, getBreaksForEntries } from '@/lib/db/queries/entry-breaks'
 import { breakToInterval } from '@/lib/business/breaks'
 
 export interface DaySummary {
@@ -17,7 +17,11 @@ export interface BalanceResult {
   cumulativeBalance: number
 }
 
-/** Net task duration minus any overlapping break time, in minutes. */
+/**
+ * Net task duration minus any overlapping break time, in minutes.
+ * Known limitation: tasks spanning midnight are not split across entries.
+ * Breaks on the next calendar day won't be deducted from midnight-spanning tasks.
+ */
 function netTaskMinutes(
   startTime: string,
   endTime: string,
@@ -43,14 +47,19 @@ function netTaskMinutes(
 export function computeBalance(userId: string, upToDate?: string): BalanceResult {
   const to = upToDate ?? new Date().toISOString().split('T')[0]
   const allEntries = listEntries(userId, undefined, to)
+  const entryIds = allEntries.map((e) => e.id)
+
+  // Batch-fetch all tasks and breaks in 2 queries instead of 2N
+  const tasksMap = listTasksForEntries(entryIds)
+  const breaksMap = getBreaksForEntries(entryIds)
 
   const days: DaySummary[] = []
   let totalWorked = 0
   let totalExpected = 0
 
   for (const entry of allEntries) {
-    const entryTasks = listTasksForEntry(entry.id)
-    const entryBreaks = getEntryBreaks(entry.id)
+    const entryTasks = tasksMap.get(entry.id) ?? []
+    const entryBreaks = breaksMap.get(entry.id) ?? []
     const breakIntervals = entryBreaks.map((b) => breakToInterval(b, entry.date))
 
     const workedMinutes = entryTasks

@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { listEntries } from '@/lib/db/queries/entries'
-import { listTasksForEntry } from '@/lib/db/queries/tasks'
+import { listTasksForEntries } from '@/lib/db/queries/tasks'
 
 function escapeCsv(val: unknown): string {
   const s = String(val ?? '')
@@ -19,12 +19,13 @@ export async function GET(req: NextRequest) {
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const allEntries = listEntries(session.user.id)
+  const tasksMap = listTasksForEntries(allEntries.map((e) => e.id))
   const rows: string[] = [
     'date,entry_start,entry_end,expected_minutes,task_start,task_end,task_description,task_tags,task_duration_minutes',
   ]
 
   for (const entry of allEntries) {
-    const tasks = listTasksForEntry(entry.id)
+    const tasks = tasksMap.get(entry.id) ?? []
     if (tasks.length === 0) {
       rows.push(
         [entry.date, entry.startTime ?? '', entry.endTime ?? '', entry.expectedMinutes, '', '', '', '', '']

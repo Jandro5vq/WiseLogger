@@ -1,6 +1,7 @@
 import { db } from '@/lib/db'
 import { tasks } from '@db/schema'
-import { eq, and, isNull, sql } from 'drizzle-orm'
+import { eq, and, isNull, sql, inArray } from 'drizzle-orm'
+import type { Task } from '@/types/db'
 
 export function getTaskById(id: string) {
   return db.select().from(tasks).where(eq(tasks.id, id)).get()
@@ -46,6 +47,7 @@ export function createTask(data: {
   endTime?: string
   description: string
   tags?: string
+  notes?: string | null
 }) {
   return db
     .insert(tasks)
@@ -60,4 +62,17 @@ export function updateTask(id: string, data: Partial<typeof tasks.$inferInsert>)
 
 export function deleteTask(id: string) {
   return db.delete(tasks).where(eq(tasks.id, id)).returning().get()
+}
+
+/** Batch-fetch tasks for multiple entries in a single query. */
+export function listTasksForEntries(entryIds: string[]): Map<string, Task[]> {
+  const map = new Map<string, Task[]>()
+  if (entryIds.length === 0) return map
+  const rows = db.select().from(tasks).where(inArray(tasks.entryId, entryIds)).orderBy(tasks.startTime).all()
+  for (const row of rows) {
+    const list = map.get(row.entryId)
+    if (list) list.push(row)
+    else map.set(row.entryId, [row])
+  }
+  return map
 }

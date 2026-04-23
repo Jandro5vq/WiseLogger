@@ -11,5 +11,7 @@ export async function GET(req: NextRequest) {
 
   const upToDate = new URL(req.url).searchParams.get('upTo') ?? undefined
   const result = computeBalance(session.user.id, upToDate)
-  return NextResponse.json(result)
+  return NextResponse.json(result, {
+    headers: { 'Cache-Control': 'private, max-age=60' },
+  })
 }

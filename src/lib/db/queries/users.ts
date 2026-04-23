@@ -41,6 +41,6 @@ export function updateUser(id: string, data: Partial<typeof users.$inferInsert>)
 }
 
 export function countUsers(): number {
-  const result = db.select({ count: users.id }).from(users).all()
-  return result.length
+  const result = db.select({ count: sql<number>`count(*)` }).from(users).get()
+  return result?.count ?? 0
 }

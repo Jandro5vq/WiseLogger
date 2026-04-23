@@ -7,6 +7,7 @@ import fs from 'fs'
 // Singleton pattern — prevents multiple connections during Next.js hot reload
 const globalForDb = global as typeof global & {
   __sqlite?: Database.Database
+  __drizzle?: ReturnType<typeof drizzle>
 }
 
 function getOrCreateDb(): Database.Database {
@@ -31,9 +32,15 @@ export const sqlite = new Proxy({} as Database.Database, {
   },
 })
 
+function getOrCreateDrizzle(): ReturnType<typeof drizzle> {
+  if (!globalForDb.__drizzle) {
+    globalForDb.__drizzle = drizzle(getOrCreateDb(), { schema })
+  }
+  return globalForDb.__drizzle
+}
+
 export const db = new Proxy({} as ReturnType<typeof drizzle>, {
   get(_target, prop) {
-    const instance = drizzle(getOrCreateDb(), { schema })
-    return (instance as unknown as Record<string | symbol, unknown>)[prop]
+    return (getOrCreateDrizzle() as unknown as Record<string | symbol, unknown>)[prop]
   },
 })

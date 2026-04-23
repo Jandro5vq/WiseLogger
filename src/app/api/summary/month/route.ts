@@ -31,5 +31,7 @@ export async function GET(req: NextRequest) {
     totalExpectedMinutes: monthDays.reduce((s, d) => s + d.expectedMinutes, 0),
     monthBalance: monthDays.reduce((s, d) => s + d.dayBalance, 0),
     cumulativeBalance: result.cumulativeBalance,
+  }, {
+    headers: { 'Cache-Control': 'private, max-age=60' },
   })
 }

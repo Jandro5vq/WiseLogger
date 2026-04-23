@@ -11,7 +11,7 @@ import { DayControls } from '@/components/dashboard/day-controls'
 import { DayTimeline } from '@/components/dashboard/day-timeline'
 import { BreaksPanel } from '@/components/dashboard/breaks-panel'
 import { DailyNotes } from '@/components/dashboard/daily-notes'
-import { listEntries, updateEntry } from '@/lib/db/queries/entries'
+import { listEntries, listUnclosedEntriesBefore, updateEntry } from '@/lib/db/queries/entries'
 import { autoSplitActiveTask } from '@/lib/business/spans'
 import { breakToInterval } from '@/lib/business/breaks'
 
@@ -24,9 +24,9 @@ export default async function DashboardPage() {
   const today = todayDateString(session.user.timezone)
 
   // Auto-close any unclosed entries from previous days
-  const allEntries = listEntries(session.user.id, undefined, today)
-  for (const e of allEntries) {
-    if (e.date < today && !e.endTime && e.startTime) {
+  const unclosedPast = listUnclosedEntriesBefore(session.user.id, today)
+  for (const e of unclosedPast) {
+    if (e.startTime) {
       const breakMins = getTotalBreakMinutes(e.id)
       const endMs = new Date(e.startTime).getTime() + (e.expectedMinutes + breakMins) * 60_000
       const autoEndTime = new Date(endMs).toISOString()
@@ -69,6 +69,7 @@ export default async function DashboardPage() {
   const expectedEndIso = new Date(refMs + (entry.expectedMinutes + totalBreakMinutes) * 60_000).toISOString()
 
   // Recent entries for notes history (last 6 days before today)
+  const allEntries = listEntries(session.user.id, undefined, today)
   const recentEntries = allEntries
     .filter((e) => e.date !== today && e.notes)
     .slice(-6)
