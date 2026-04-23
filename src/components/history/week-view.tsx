@@ -1,10 +1,40 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import Link from 'next/link'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { formatMinutes } from '@/lib/utils'
 import type { TaskWithTags } from '@/types/db'
 import { ArrowLeftBox, ArrowRightBox } from 'pixelarticons/react'
+import { useToast } from '@/components/ui/toast'
+
+const BILLED_KEY = 'wl:billed'
+
+function loadBilled(): Set<string> {
+  if (typeof window === 'undefined') return new Set()
+  try {
+    const raw = localStorage.getItem(BILLED_KEY)
+    if (!raw) return new Set()
+    const entries = JSON.parse(raw) as string[]
+    // Prune entries older than 8 weeks
+    const cutoff = new Date()
+    cutoff.setDate(cutoff.getDate() - 56)
+    const cutoffStr = cutoff.toISOString().slice(0, 10)
+    const pruned = entries.filter((key) => key.slice(0, 10) >= cutoffStr)
+    if (pruned.length < entries.length) {
+      localStorage.setItem(BILLED_KEY, JSON.stringify(pruned))
+    }
+    return new Set(pruned)
+  } catch { return new Set() }
+}
+
+function saveBilled(set: Set<string>) {
+  localStorage.setItem(BILLED_KEY, JSON.stringify(Array.from(set)))
+}
+
+function billedKey(date: string, description: string) {
+  return `${date}::${description}`
+}
 
 // Use local date to avoid UTC offset shifting the day
 function localDate(d: Date): string {
@@ -14,7 +44,7 @@ function localDate(d: Date): string {
   return `${y}-${m}-${day}`
 }
 
-function CopyButton({ text }: { text: string }) {
+function CopyButton({ text, title = 'Copiar' }: { text: string; title?: string }) {
   const [copied, setCopied] = useState(false)
 
   function copy(e: React.MouseEvent) {
@@ -29,7 +59,7 @@ function CopyButton({ text }: { text: string }) {
   return (
     <button
       onClick={copy}
-      title="Copiar descripción"
+      title={title}
       className="shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
     >
       {copied ? (
@@ -74,8 +104,8 @@ function isToday(dateStr: string): boolean {
 }
 
 // Group tasks by description, compute total per group
-function groupTasks(tasks: TaskWithTags[]): { description: string; tags: string[]; totalMinutes: number; sessions: number }[] {
-  const map = new Map<string, { tags: string[]; totalMs: number; sessions: number }>()
+function groupTasks(tasks: TaskWithTags[]): { description: string; tags: string[]; totalMinutes: number; sessions: number; notes: string | null }[] {
+  const map = new Map<string, { tags: string[]; totalMs: number; sessions: number; notes: string | null }>()
   for (const t of tasks) {
     if (!t.endTime) continue
     const ms = new Date(t.endTime).getTime() - new Date(t.startTime).getTime()
@@ -83,8 +113,10 @@ function groupTasks(tasks: TaskWithTags[]): { description: string; tags: string[
     if (existing) {
       existing.totalMs += ms
       existing.sessions++
+      // Keep latest non-null notes
+      if (t.notes) existing.notes = t.notes
     } else {
-      map.set(t.description, { tags: t.tags, totalMs: ms, sessions: 1 })
+      map.set(t.description, { tags: t.tags, totalMs: ms, sessions: 1, notes: t.notes })
     }
   }
   return Array.from(map.entries()).map(([description, v]) => ({
@@ -92,10 +124,15 @@ function groupTasks(tasks: TaskWithTags[]): { description: string; tags: string[
     tags: v.tags,
     totalMinutes: v.totalMs / 60000,
     sessions: v.sessions,
+    notes: v.notes,
   }))
 }
 
-function DayCard({ day, index }: { day: DayData; index: number }) {
+function DayCard({ day, index, billed, onToggleBilled }: {
+  day: DayData; index: number
+  billed: Set<string>
+  onToggleBilled: (date: string, description: string) => void
+}) {
   const today = isToday(day.date)
   const hasWork = day.workedMinutes > 0 || day.tasks.length > 0
   const groups = groupTasks(day.tasks)
@@ -147,23 +184,34 @@ function DayCard({ day, index }: { day: DayData; index: number }) {
         {groups.length === 0 ? (
           <p className="text-xs text-muted-foreground/50 text-center py-3">—</p>
         ) : (
-          groups.map((g) => (
-            <div key={g.description} className="flex items-center justify-between gap-2 group/row">
-              <div className="flex items-center gap-1.5 min-w-0">
-                <span className="text-xs font-medium truncate" title={g.description}>{g.description}</span>
-                <CopyButton text={g.description} />
-                {g.sessions > 1 && (
-                  <span className="text-[10px] text-muted-foreground shrink-0">×{g.sessions}</span>
-                )}
-                {g.tags.map((tag) => (
-                  <span key={tag} className="text-[10px] bg-secondary rounded px-1 py-0.5 shrink-0">{tag}</span>
-                ))}
+          groups.map((g) => {
+            const isBilled = billed.has(billedKey(day.date, g.description))
+            return (
+              <div key={g.description} className={`flex items-center justify-between gap-2 group/row ${isBilled ? 'opacity-50' : ''}`}>
+                <div className="flex items-center gap-1.5 min-w-0">
+                  <input
+                    type="checkbox"
+                    checked={isBilled}
+                    onChange={() => onToggleBilled(day.date, g.description)}
+                    title="Marcar como imputada"
+                    className="h-3 w-3 rounded border-muted-foreground/40 accent-primary shrink-0 cursor-pointer"
+                  />
+                  <span className={`text-xs font-medium truncate ${isBilled ? 'line-through' : ''}`} title={g.description}>{g.description}</span>
+                  <CopyButton text={g.notes ?? g.description} title={g.notes ? 'Copiar notas' : 'Copiar descripción'} />
+                  {g.sessions > 1 && (
+                    <span className="text-[10px] text-muted-foreground shrink-0">×{g.sessions}</span>
+                  )}
+                  {g.tags.map((tag) => (
+                    <span key={tag} className="text-[10px] bg-secondary rounded px-1 py-0.5 shrink-0">{tag}</span>
+                  ))}
+                </div>
+                <span className="text-xs font-mono font-semibold tabular-nums text-muted-foreground shrink-0">
+                  {formatMinutes(g.totalMinutes)}
+                </span>
               </div>
-              <span className="text-xs font-mono font-semibold tabular-nums text-muted-foreground shrink-0">
-                {formatMinutes(g.totalMinutes)}
-              </span>
-            </div>
-          ))
+            )
+          })
+
         )}
       </div>
     </div>
@@ -179,24 +227,43 @@ function addWeeks(dateStr: string, n: number): string {
 const WEEKEND_KEY = 'wl:showWeekends'
 
 export function WeekView() {
-  const [anchorDate, setAnchorDate] = useState(() => localDate(new Date()))
+  const toast = useToast()
+  const router = useRouter()
+  const searchParams = useSearchParams()
+  const [anchorDate, setAnchorDate] = useState(() => searchParams.get('week') ?? localDate(new Date()))
   const [data, setData] = useState<WeekData | null>(null)
   const [loading, setLoading] = useState(true)
   const [showWeekends, setShowWeekends] = useState(() => {
     if (typeof window === 'undefined') return false
     return localStorage.getItem(WEEKEND_KEY) === 'true'
   })
+  const [billed, setBilled] = useState<Set<string>>(() => loadBilled())
+
+  const toggleBilled = useCallback((date: string, description: string) => {
+    setBilled((prev) => {
+      const next = new Set(prev)
+      const key = billedKey(date, description)
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      saveBilled(next)
+      return next
+    })
+  }, [])
 
   useEffect(() => {
     setLoading(true)
     fetch(`/api/summary/week-tasks?date=${anchorDate}`)
       .then((r) => r.json())
       .then((d) => { setData(d); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [anchorDate])
+      .catch(() => { setLoading(false); toast.error('Error al cargar la semana') })
+  }, [anchorDate, toast])
 
   function navigate(n: number) {
-    setAnchorDate((d) => addWeeks(d, n))
+    setAnchorDate((prev) => {
+      const next = addWeeks(prev, n)
+      router.replace(`?week=${next}`, { scroll: false })
+      return next
+    })
   }
 
   function toggleWeekends() {
@@ -255,7 +322,7 @@ export function WeekView() {
       {data && !loading && (
         <div className="flex flex-col gap-3 max-w-3xl mx-auto">
           {visibleDays.map((day, i) => (
-            <DayCard key={day.date} day={day} index={i} />
+            <DayCard key={day.date} day={day} index={i} billed={billed} onToggleBilled={toggleBilled} />
           ))}
         </div>
       )}
