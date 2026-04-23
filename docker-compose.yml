@@ -17,6 +17,11 @@ services:
       - BACKUP_CRON=${BACKUP_CRON:-0 2 * * *}
       - BACKUP_PATH=/data/backups
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: '1.0'
 
 volumes:
   wiselogger_data:
