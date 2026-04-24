@@ -29,7 +29,6 @@ export function OnboardingTour({ initialIndex = 0, onStepChange, onDone }: Props
   const [rect, setRect] = useState<Rect | null>(null)
   const [viewport, setViewport] = useState({ w: 0, h: 0 })
   const [anchorState, setAnchorState] = useState<AnchorState>('resolving')
-  const frameRef = useRef<number | null>(null)
   const tooltipRef = useRef<HTMLDivElement | null>(null)
   const primaryBtnRef = useRef<HTMLButtonElement | null>(null)
 
@@ -41,10 +40,17 @@ export function OnboardingTour({ initialIndex = 0, onStepChange, onDone }: Props
   // Sync step index outwards so the provider can persist it.
   useEffect(() => { onStepChange?.(index) }, [index, onStepChange])
 
-  // Route + anchor resolution
+  // Prefetch the next step's route so cross-route transitions feel instant.
+  useEffect(() => {
+    const nextStep = TOUR_STEPS[index + 1]
+    if (nextStep && nextStep.route !== pathname) router.prefetch(nextStep.route)
+  }, [index, pathname, router])
+
+  // Route + anchor resolution. Uses a MutationObserver so the anchor is
+  // picked up the instant it mounts after a route change — avoids the
+  // perceived lag of RAF polling.
   useLayoutEffect(() => {
     if (!step) return
-    if (frameRef.current != null) cancelAnimationFrame(frameRef.current)
 
     if (step.route !== pathname) {
       setAnchorState('resolving')
@@ -61,26 +67,30 @@ export function OnboardingTour({ initialIndex = 0, onStepChange, onDone }: Props
 
     setAnchorState('resolving')
     setRect(null)
-    const start = performance.now()
-    const tick = () => {
+
+    const resolve = (): boolean => {
       const el = document.querySelector<HTMLElement>(step.anchor!)
-      if (el) {
-        const r = el.getBoundingClientRect()
-        setRect({ top: r.top, left: r.left, width: r.width, height: r.height })
-        el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'nearest' })
-        setAnchorState('found')
-        return
-      }
-      if (performance.now() - start < ANCHOR_TIMEOUT_MS) {
-        frameRef.current = requestAnimationFrame(tick)
-      } else {
-        setAnchorState('missing')
-        setRect(null)
-      }
+      if (!el) return false
+      const r = el.getBoundingClientRect()
+      setRect({ top: r.top, left: r.left, width: r.width, height: r.height })
+      el.scrollIntoView({ block: 'center', inline: 'nearest' })
+      setAnchorState('found')
+      return true
     }
-    frameRef.current = requestAnimationFrame(tick)
+
+    if (resolve()) return
+
+    const observer = new MutationObserver(() => { if (resolve()) observer.disconnect() })
+    observer.observe(document.body, { childList: true, subtree: true })
+
+    const timer = window.setTimeout(() => {
+      observer.disconnect()
+      if (!resolve()) setAnchorState('missing')
+    }, ANCHOR_TIMEOUT_MS)
+
     return () => {
-      if (frameRef.current != null) cancelAnimationFrame(frameRef.current)
+      observer.disconnect()
+      clearTimeout(timer)
     }
   }, [step, pathname, router])
 
