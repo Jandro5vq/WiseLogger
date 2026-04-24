@@ -143,12 +143,14 @@ export function OnboardingTour({ initialIndex = 0, onStepChange, onDone }: Props
 
   if (!step) return null
 
-  const showSpotlight = anchorState === 'found' && rect && step.placement !== 'center'
-  const showCenter = step.placement === 'center' || anchorState !== 'found'
+  // Spotlight requires a resolved, non-null rect and a non-center placement.
+  // Anything else (center step, resolving, missing, or rect briefly null mid-
+  // transition) falls back to the centred tooltip to avoid deref crashes.
+  const canAnchor = anchorState === 'found' && rect !== null && step.placement !== 'center'
 
   // Tooltip position
   let tooltipStyle: React.CSSProperties
-  if (showCenter) {
+  if (!canAnchor || !rect) {
     tooltipStyle = {
       top: viewport.h / 2,
       left: viewport.w / 2,
@@ -156,16 +158,15 @@ export function OnboardingTour({ initialIndex = 0, onStepChange, onDone }: Props
       width: Math.min(TOOLTIP_WIDTH, Math.max(viewport.w - 32, 280)),
     }
   } else {
-    const r = rect!
-    const spaceBelow = viewport.h - (r.top + r.height)
-    const spaceAbove = r.top
+    const spaceBelow = viewport.h - (rect.top + rect.height)
+    const spaceAbove = rect.top
     const placeBelow = spaceBelow >= 220 || spaceBelow >= spaceAbove
     const width = Math.min(TOOLTIP_WIDTH, viewport.w - 32)
-    const rawLeft = r.left + r.width / 2 - width / 2
+    const rawLeft = rect.left + rect.width / 2 - width / 2
     const left = Math.max(16, Math.min(rawLeft, viewport.w - width - 16))
     const top = placeBelow
-      ? r.top + r.height + TOOLTIP_GAP
-      : Math.max(16, r.top - TOOLTIP_GAP)
+      ? rect.top + rect.height + TOOLTIP_GAP
+      : Math.max(16, rect.top - TOOLTIP_GAP)
     tooltipStyle = {
       top,
       left,
@@ -189,14 +190,14 @@ export function OnboardingTour({ initialIndex = 0, onStepChange, onDone }: Props
       </div>
 
       {/* Spotlight (anchored) or full backdrop (center / missing) */}
-      {showSpotlight ? (
+      {canAnchor && rect ? (
         <div
           className="pointer-events-none absolute rounded-lg tour-spotlight"
           style={{
-            top: rect!.top - PADDING,
-            left: rect!.left - PADDING,
-            width: rect!.width + PADDING * 2,
-            height: rect!.height + PADDING * 2,
+            top: rect.top - PADDING,
+            left: rect.left - PADDING,
+            width: rect.width + PADDING * 2,
+            height: rect.height + PADDING * 2,
             transition: 'top 0.2s ease, left 0.2s ease, width 0.2s ease, height 0.2s ease',
           }}
         />
