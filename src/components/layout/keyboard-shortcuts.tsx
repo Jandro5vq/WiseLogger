@@ -3,6 +3,18 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
+export interface Shortcut {
+  keys: string[]
+  label: string
+}
+
+export const SHORTCUTS: Shortcut[] = [
+  { keys: ['N'], label: 'Nueva tarea' },
+  { keys: ['S'], label: 'Detener la tarea activa' },
+  { keys: ['C'], label: 'Cerrar la jornada' },
+  { keys: ['/'], label: 'Buscar' },
+]
+
 export function KeyboardShortcuts() {
   const router = useRouter()
 

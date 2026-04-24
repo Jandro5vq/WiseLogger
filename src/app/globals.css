@@ -76,3 +76,12 @@
     @apply bg-background text-foreground;
   }
 }
+
+/* ── Onboarding tour ─────────────────────────────────────────────────────── */
+@keyframes tour-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 hsl(var(--primary) / 0.55), 0 0 0 9999px rgba(0,0,0,0.6); }
+  50%      { box-shadow: 0 0 0 6px hsl(var(--primary) / 0.20), 0 0 0 9999px rgba(0,0,0,0.6); }
+}
+.tour-spotlight {
+  animation: tour-pulse 2s ease-in-out infinite;
+}
