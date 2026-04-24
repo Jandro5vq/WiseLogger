@@ -37,7 +37,11 @@ function LoginForm() {
 
     const raw = searchParams.get('redirect') || '/dashboard'
     const redirect = raw.startsWith('/') && !raw.startsWith('//') ? raw : '/dashboard'
-    router.push(redirect)
+    // Full reload instead of router.push: the App Router reuses the RSC cache
+    // from the previous session, so soft navigation would show the old user
+    // until F5. A browser navigation re-renders the (app) layout with the
+    // fresh cookie.
+    window.location.assign(redirect)
   }
 
   return (

@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { Clock, Calendar, ChartBarBig, Settings2, User, Logout } from 'pixelarticons/react'
 
@@ -14,11 +14,11 @@ const navItems = [
 
 export function Sidebar({ isAdmin }: { isAdmin: boolean }) {
   const pathname = usePathname()
-  const router = useRouter()
 
   async function handleLogout() {
     await fetch('/api/auth/logout', { method: 'POST' })
-    router.push('/login')
+    // Full reload: avoids RSC cache showing the old session under /(app) until F5.
+    window.location.assign('/login')
   }
 
   return (
