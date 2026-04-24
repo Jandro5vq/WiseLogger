@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import type { DaySummary } from '@/lib/business/balance'
 
 export interface CellMeta {
@@ -64,10 +64,19 @@ export function ActivityHeatmap({
 }: ActivityHeatmapProps) {
   const [hover, setHover] = useState<{ cell: CellMeta; x: number; y: number } | null>(null)
 
-  const grid = useMemo(() => {
+  // Defer "today" to post-mount so SSR and client don't disagree on the grid's
+  // date boundaries when the server clock and user's local clock sit on
+  // different calendar days.
+  const [today, setToday] = useState<Date | null>(null)
+  useEffect(() => {
+    const d = new Date()
+    d.setHours(0, 0, 0, 0)
+    setToday(d)
+  }, [])
+
+  const grid = useMemo<Array<Array<CellMeta | null>>>(() => {
+    if (!today) return []
     const map = new Map(days.map((d) => [d.date, d]))
-    const today = new Date()
-    today.setHours(0, 0, 0, 0)
     const totalDays = weeks * 7
     const start = new Date(today)
     start.setDate(today.getDate() - (totalDays - 1))
@@ -93,7 +102,7 @@ export function ActivityHeatmap({
       cols.push(week)
     }
     return cols
-  }, [days, weeks, taskCountByDate])
+  }, [days, weeks, taskCountByDate, today])
 
   function handleEnter(e: React.MouseEvent<HTMLButtonElement>, cell: CellMeta) {
     const rect = e.currentTarget.getBoundingClientRect()

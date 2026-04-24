@@ -279,13 +279,16 @@ export function WeekView() {
   const [anchorDate, setAnchorDate] = useState(() => searchParams.get('week') ?? localDate(new Date()))
   const [data, setData] = useState<WeekData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [showWeekends, setShowWeekends] = useState(() => {
-    if (typeof window === 'undefined') return false
-    return localStorage.getItem(WEEKEND_KEY) === 'true'
-  })
-  const [billed, setBilled] = useState<BilledMap>(() => loadBilled())
+  const [showWeekends, setShowWeekends] = useState(false)
+  const [billed, setBilled] = useState<BilledMap>(() => new Map())
   const billedRef = useRef(billed)
   useEffect(() => { billedRef.current = billed }, [billed])
+
+  // Hydrate browser-only preferences after mount to avoid SSR/client divergence.
+  useEffect(() => {
+    setShowWeekends(localStorage.getItem(WEEKEND_KEY) === 'true')
+    setBilled(loadBilled())
+  }, [])
 
   const toggleBilled = useCallback((date: string, description: string, signature: string) => {
     setBilled((prev) => {
