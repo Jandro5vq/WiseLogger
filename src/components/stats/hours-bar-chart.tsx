@@ -18,8 +18,8 @@ export function HoursBarChart({ days }: { days: DaySummary[] }) {
           <YAxis tick={{ fontSize: 11 }} unit="h" />
           <Tooltip formatter={(v) => `${v}h`} />
           <Legend />
-          <Bar dataKey="expected" name="Expected" fill="hsl(var(--muted-foreground))" opacity={0.4} />
-          <Bar dataKey="worked" name="Worked" fill="hsl(var(--primary))" />
+          <Bar dataKey="expected" name="Esperado" fill="hsl(var(--muted-foreground))" opacity={0.4} />
+          <Bar dataKey="worked" name="Trabajado" fill="hsl(var(--primary))" />
         </BarChart>
       </ResponsiveContainer>
     </div>

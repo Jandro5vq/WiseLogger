@@ -22,7 +22,7 @@ export interface BalanceResult {
  * Known limitation: tasks spanning midnight are not split across entries.
  * Breaks on the next calendar day won't be deducted from midnight-spanning tasks.
  */
-function netTaskMinutes(
+export function netTaskMinutes(
   startTime: string,
   endTime: string,
   breakIntervals: Array<{ startIso: string; endIso: string }>
@@ -41,12 +41,13 @@ function netTaskMinutes(
 }
 
 /**
- * Computes balance for a user up to the given date (inclusive).
+ * Computes balance for a user within [fromDate, upToDate] (both inclusive).
+ * If fromDate is omitted, reads from the start of history.
  * Always reads from DB — never cached.
  */
-export function computeBalance(userId: string, upToDate?: string): BalanceResult {
+export function computeBalance(userId: string, upToDate?: string, fromDate?: string): BalanceResult {
   const to = upToDate ?? new Date().toISOString().split('T')[0]
-  const allEntries = listEntries(userId, undefined, to)
+  const allEntries = listEntries(userId, fromDate, to)
   const entryIds = allEntries.map((e) => e.id)
 
   // Batch-fetch all tasks and breaks in 2 queries instead of 2N

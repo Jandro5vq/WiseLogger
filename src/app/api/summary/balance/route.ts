@@ -9,8 +9,10 @@ export async function GET(req: NextRequest) {
   const session = await getSession(req)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const upToDate = new URL(req.url).searchParams.get('upTo') ?? undefined
-  const result = computeBalance(session.user.id, upToDate)
+  const params = new URL(req.url).searchParams
+  const upToDate = params.get('upTo') ?? undefined
+  const fromDate = params.get('from') ?? undefined
+  const result = computeBalance(session.user.id, upToDate, fromDate)
   return NextResponse.json(result, {
     headers: { 'Cache-Control': 'private, max-age=60' },
   })
