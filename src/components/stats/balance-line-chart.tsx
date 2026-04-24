@@ -24,7 +24,7 @@ export function BalanceLineChart({ days }: { days: DaySummary[] }) {
           <Line
             type="monotone"
             dataKey="balance"
-            name="Cumulative balance"
+            name="Balance acumulado"
             stroke="hsl(var(--primary))"
             dot={false}
             strokeWidth={2}
