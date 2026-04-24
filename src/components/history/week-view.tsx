@@ -364,7 +364,7 @@ export function WeekView() {
   return (
     <div className="space-y-4">
       {/* week navigation */}
-      <div className="flex items-center justify-between">
+      <div data-tour="week-nav" className="flex items-center justify-between">
         <button
           onClick={() => navigate(-1)}
           className="rounded-md p-2 hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"

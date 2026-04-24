@@ -75,7 +75,7 @@ export function DailyNotes({ entryId, initialNotes, recentEntries }: DailyNotesP
   })
 
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
+    <div data-tour="daily-notes" className="rounded-lg border border-border bg-card overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
         <h2 className="text-sm font-medium">Notas</h2>
         {saving && <span className="text-xs text-muted-foreground">Guardando…</span>}

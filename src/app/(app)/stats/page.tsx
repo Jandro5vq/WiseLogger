@@ -52,7 +52,7 @@ export default function StatsPage() {
     data ? data.totalWorkedMinutes - data.totalExpectedMinutes : 0
 
   return (
-    <div className="max-w-6xl mx-auto space-y-6">
+    <div data-tour="stats-main" className="max-w-6xl mx-auto space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Estadísticas</h1>
         <div className="flex rounded-md border border-border overflow-hidden">

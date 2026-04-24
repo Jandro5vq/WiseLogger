@@ -134,7 +134,7 @@ export function DayTimeline({ tasks, breaks = [], entryDate }: DayTimelineProps)
   const chartH = rows.length * ROW_H
 
   return (
-    <div className="rounded-xl border border-border bg-card overflow-hidden">
+    <div data-tour="timeline" className="rounded-xl border border-border bg-card overflow-hidden">
       {/* header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
         <h2 className="text-sm font-semibold tracking-wide">Timeline</h2>

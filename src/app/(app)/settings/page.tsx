@@ -801,7 +801,7 @@ export default function SettingsPage() {
       <h1 className="text-2xl font-bold">Ajustes</h1>
 
       {/* Horario de trabajo */}
-      <section className="rounded-lg border border-border bg-card p-6">
+      <section data-tour="schedule-rules" className="rounded-lg border border-border bg-card p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold">Horario de trabajo</h2>
           {!showAddForm && (
@@ -958,7 +958,7 @@ export default function SettingsPage() {
       </section>
 
       {/* Apariencia */}
-      <section className="rounded-lg border border-border bg-card p-6">
+      <section data-tour="appearance" className="rounded-lg border border-border bg-card p-6">
         <h2 className="text-lg font-semibold mb-4">Apariencia</h2>
         <AccentPicker />
       </section>
