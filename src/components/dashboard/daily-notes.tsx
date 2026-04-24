@@ -3,8 +3,17 @@
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
-import DOMPurify from 'dompurify'
+import createDOMPurify from 'dompurify'
 import { useEffect, useRef, useState, useCallback } from 'react'
+
+// dompurify v3's default export is a factory — it has no `.sanitize` until
+// invoked with a window. Cache a browser-bound instance on first use.
+let purifier: { sanitize: (html: string) => string } | null = null
+function sanitizeHtml(html: string): string {
+  if (typeof window === 'undefined') return ''
+  if (!purifier) purifier = createDOMPurify(window) as { sanitize: (h: string) => string }
+  return purifier.sanitize(html)
+}
 
 interface RecentEntry {
   date: string
@@ -24,11 +33,15 @@ function fmtDate(dateStr: string): string {
 }
 
 function NotesViewer({ html }: { html: string }) {
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+
   if (!html) return <p className="text-xs text-muted-foreground italic">Sin notas</p>
+  if (!mounted) return <div className="h-4" aria-hidden />
   return (
     <div
       className="prose prose-sm dark:prose-invert max-w-none text-xs text-muted-foreground"
-      dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(html) }}
+      dangerouslySetInnerHTML={{ __html: sanitizeHtml(html) }}
     />
   )
 }
