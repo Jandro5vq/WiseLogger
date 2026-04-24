@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { formatMinutes } from '@/lib/utils'
@@ -9,31 +9,66 @@ import { ArrowLeftBox, ArrowRightBox } from 'pixelarticons/react'
 import { useToast } from '@/components/ui/toast'
 
 const BILLED_KEY = 'wl:billed'
+const BILLED_VERSION_KEY = 'wl:billedVersion'
+const BILLED_VERSION = '2'
 
-function loadBilled(): Set<string> {
-  if (typeof window === 'undefined') return new Set()
+type BilledMap = Map<string, string> // `date::description` → signature
+
+function loadBilled(): BilledMap {
+  if (typeof window === 'undefined') return new Map()
   try {
+    // Drop legacy v1 data (was a plain string[])
+    if (localStorage.getItem(BILLED_VERSION_KEY) !== BILLED_VERSION) {
+      localStorage.removeItem(BILLED_KEY)
+      localStorage.setItem(BILLED_VERSION_KEY, BILLED_VERSION)
+      return new Map()
+    }
     const raw = localStorage.getItem(BILLED_KEY)
-    if (!raw) return new Set()
-    const entries = JSON.parse(raw) as string[]
+    if (!raw) return new Map()
+    const obj = JSON.parse(raw) as Record<string, string>
     // Prune entries older than 8 weeks
     const cutoff = new Date()
     cutoff.setDate(cutoff.getDate() - 56)
     const cutoffStr = cutoff.toISOString().slice(0, 10)
-    const pruned = entries.filter((key) => key.slice(0, 10) >= cutoffStr)
-    if (pruned.length < entries.length) {
-      localStorage.setItem(BILLED_KEY, JSON.stringify(pruned))
+    const map = new Map<string, string>()
+    for (const [k, v] of Object.entries(obj)) {
+      if (k.slice(0, 10) >= cutoffStr) map.set(k, v)
     }
-    return new Set(pruned)
-  } catch { return new Set() }
+    if (map.size < Object.keys(obj).length) saveBilled(map)
+    return map
+  } catch { return new Map() }
 }
 
-function saveBilled(set: Set<string>) {
-  localStorage.setItem(BILLED_KEY, JSON.stringify(Array.from(set)))
+function saveBilled(map: BilledMap) {
+  const obj: Record<string, string> = {}
+  map.forEach((v, k) => { obj[k] = v })
+  localStorage.setItem(BILLED_KEY, JSON.stringify(obj))
+  localStorage.setItem(BILLED_VERSION_KEY, BILLED_VERSION)
 }
 
 function billedKey(date: string, description: string) {
   return `${date}::${description}`
+}
+
+function djb2(s: string): string {
+  let h = 5381
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0
+  return (h >>> 0).toString(36)
+}
+
+function groupSignature(tasks: TaskWithTags[]): string {
+  const parts = [...tasks]
+    .sort((a, b) => a.id.localeCompare(b.id))
+    .map((t) => [
+      t.id,
+      t.startTime,
+      t.endTime ?? '',
+      (t.tags ?? []).join(','),
+      t.notes ?? '',
+      t.description,
+    ].join('|'))
+    .join('\n')
+  return djb2(parts)
 }
 
 // Use local date to avoid UTC offset shifting the day
@@ -104,8 +139,17 @@ function isToday(dateStr: string): boolean {
 }
 
 // Group tasks by description, compute total per group
-function groupTasks(tasks: TaskWithTags[]): { description: string; tags: string[]; totalMinutes: number; sessions: number; notes: string | null }[] {
-  const map = new Map<string, { tags: string[]; totalMs: number; sessions: number; notes: string | null }>()
+interface TaskGroup {
+  description: string
+  tags: string[]
+  totalMinutes: number
+  sessions: number
+  notes: string | null
+  signature: string
+}
+
+function groupTasks(tasks: TaskWithTags[]): TaskGroup[] {
+  const map = new Map<string, { tags: string[]; totalMs: number; sessions: number; notes: string | null; tasks: TaskWithTags[] }>()
   for (const t of tasks) {
     if (!t.endTime) continue
     const ms = new Date(t.endTime).getTime() - new Date(t.startTime).getTime()
@@ -113,10 +157,11 @@ function groupTasks(tasks: TaskWithTags[]): { description: string; tags: string[
     if (existing) {
       existing.totalMs += ms
       existing.sessions++
+      existing.tasks.push(t)
       // Keep latest non-null notes
       if (t.notes) existing.notes = t.notes
     } else {
-      map.set(t.description, { tags: t.tags, totalMs: ms, sessions: 1, notes: t.notes })
+      map.set(t.description, { tags: t.tags, totalMs: ms, sessions: 1, notes: t.notes, tasks: [t] })
     }
   }
   return Array.from(map.entries()).map(([description, v]) => ({
@@ -125,13 +170,14 @@ function groupTasks(tasks: TaskWithTags[]): { description: string; tags: string[
     totalMinutes: v.totalMs / 60000,
     sessions: v.sessions,
     notes: v.notes,
+    signature: groupSignature(v.tasks),
   }))
 }
 
 function DayCard({ day, index, billed, onToggleBilled }: {
   day: DayData; index: number
-  billed: Set<string>
-  onToggleBilled: (date: string, description: string) => void
+  billed: BilledMap
+  onToggleBilled: (date: string, description: string, signature: string) => void
 }) {
   const today = isToday(day.date)
   const hasWork = day.workedMinutes > 0 || day.tasks.length > 0
@@ -185,14 +231,14 @@ function DayCard({ day, index, billed, onToggleBilled }: {
           <p className="text-xs text-muted-foreground/50 text-center py-3">—</p>
         ) : (
           groups.map((g) => {
-            const isBilled = billed.has(billedKey(day.date, g.description))
+            const isBilled = billed.get(billedKey(day.date, g.description)) === g.signature
             return (
               <div key={g.description} className={`flex items-center justify-between gap-2 group/row ${isBilled ? 'opacity-50' : ''}`}>
                 <div className="flex items-center gap-1.5 min-w-0">
                   <input
                     type="checkbox"
                     checked={isBilled}
-                    onChange={() => onToggleBilled(day.date, g.description)}
+                    onChange={() => onToggleBilled(day.date, g.description, g.signature)}
                     title="Marcar como imputada"
                     className="h-3 w-3 rounded border-muted-foreground/40 accent-primary shrink-0 cursor-pointer"
                   />
@@ -237,14 +283,16 @@ export function WeekView() {
     if (typeof window === 'undefined') return false
     return localStorage.getItem(WEEKEND_KEY) === 'true'
   })
-  const [billed, setBilled] = useState<Set<string>>(() => loadBilled())
+  const [billed, setBilled] = useState<BilledMap>(() => loadBilled())
+  const billedRef = useRef(billed)
+  useEffect(() => { billedRef.current = billed }, [billed])
 
-  const toggleBilled = useCallback((date: string, description: string) => {
+  const toggleBilled = useCallback((date: string, description: string, signature: string) => {
     setBilled((prev) => {
-      const next = new Set(prev)
+      const next = new Map(prev)
       const key = billedKey(date, description)
-      if (next.has(key)) next.delete(key)
-      else next.add(key)
+      if (next.get(key) === signature) next.delete(key)
+      else next.set(key, signature)
       saveBilled(next)
       return next
     })
@@ -254,7 +302,36 @@ export function WeekView() {
     setLoading(true)
     fetch(`/api/summary/week-tasks?date=${anchorDate}`)
       .then((r) => r.json())
-      .then((d) => { setData(d); setLoading(false) })
+      .then((d: WeekData) => {
+        setData(d)
+        setLoading(false)
+
+        // Detect billed entries whose underlying tasks changed
+        const currentSigs = new Map<string, string>()
+        for (const day of d.days) {
+          for (const g of groupTasks(day.tasks)) {
+            currentSigs.set(billedKey(day.date, g.description), g.signature)
+          }
+        }
+        const stale: string[] = []
+        billedRef.current.forEach((sig, key) => {
+          const dateStr = key.slice(0, 10)
+          if (dateStr < d.from || dateStr > d.to) return
+          const current = currentSigs.get(key)
+          if (current === undefined || current !== sig) stale.push(key)
+        })
+        if (stale.length > 0) {
+          setBilled((prev) => {
+            const next = new Map(prev)
+            for (const k of stale) next.delete(k)
+            saveBilled(next)
+            return next
+          })
+          toast.info(stale.length === 1
+            ? 'Se desmarcó 1 tarea imputada porque fue modificada'
+            : `Se desmarcaron ${stale.length} tareas imputadas porque fueron modificadas`)
+        }
+      })
       .catch(() => { setLoading(false); toast.error('Error al cargar la semana') })
   }, [anchorDate, toast])
 

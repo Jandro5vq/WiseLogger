@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { ThemeProvider } from '@/components/layout/theme-provider'
+import { AccentProvider } from '@/components/layout/accent-provider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -29,10 +30,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <head>
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
         <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `try{var a=localStorage.getItem('wl:accent');if(a)document.documentElement.setAttribute('data-accent',a);}catch(e){}`,
+          }}
+        />
       </head>
       <body className={inter.className}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
-          {children}
+          <AccentProvider>{children}</AccentProvider>
         </ThemeProvider>
       </body>
     </html>

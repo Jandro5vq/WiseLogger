@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMinutes } from '@/lib/utils'
 import { TimeInput } from '@/components/ui/time-input'
+import { ACCENTS, readStoredAccent, setStoredAccent, type AccentId } from '@/components/layout/accent-provider'
 
 // ─── Break rules ─────────────────────────────────────────────────────────────
 
@@ -606,6 +607,43 @@ function WeekendToggle() {
   )
 }
 
+function AccentPicker() {
+  const [accent, setAccent] = useState<AccentId>('blue')
+  useEffect(() => { setAccent(readStoredAccent()) }, [])
+
+  function choose(id: AccentId) {
+    setAccent(id)
+    setStoredAccent(id)
+  }
+
+  return (
+    <div className="flex items-center justify-between gap-4">
+      <div>
+        <p className="text-sm font-medium">Color de acento</p>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Afecta a botones principales, enlaces y estados activos
+        </p>
+      </div>
+      <div className="flex items-center gap-2 flex-wrap justify-end">
+        {ACCENTS.map((a) => (
+          <button
+            key={a.id}
+            type="button"
+            onClick={() => choose(a.id)}
+            title={a.label}
+            aria-label={`Usar acento ${a.label}`}
+            aria-pressed={accent === a.id}
+            className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${
+              accent === a.id ? 'border-foreground scale-110' : 'border-transparent'
+            }`}
+            style={{ backgroundColor: a.hex }}
+          />
+        ))}
+      </div>
+    </div>
+  )
+}
+
 function WorkdayAdjustToggle({
   storageKey,
   label,
@@ -917,6 +955,12 @@ export default function SettingsPage() {
         >
           Rehacer tutorial
         </button>
+      </section>
+
+      {/* Apariencia */}
+      <section className="rounded-lg border border-border bg-card p-6">
+        <h2 className="text-lg font-semibold mb-4">Apariencia</h2>
+        <AccentPicker />
       </section>
 
       {/* Calendario */}

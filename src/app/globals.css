@@ -50,6 +50,24 @@
   }
 }
 
+/* ── Accent presets ─────────────────────────────────────────────────────────
+   Override --primary + --ring on :root[data-accent="…"] (light) and
+   .dark[data-accent="…"] (dark). "blue" is the default defined above. */
+:root[data-accent="purple"] { --primary: 270 70% 55%; --ring: 270 70% 55%; }
+.dark[data-accent="purple"] { --primary: 270 65% 65%; --ring: 270 65% 65%; }
+
+:root[data-accent="teal"]   { --primary: 172 72% 40%; --ring: 172 72% 40%; }
+.dark[data-accent="teal"]   { --primary: 172 55% 52%; --ring: 172 55% 52%; }
+
+:root[data-accent="green"]  { --primary: 142 65% 42%; --ring: 142 65% 42%; }
+.dark[data-accent="green"]  { --primary: 142 55% 52%; --ring: 142 55% 52%; }
+
+:root[data-accent="orange"] { --primary: 24 92% 52%; --ring: 24 92% 52%; }
+.dark[data-accent="orange"] { --primary: 24 82% 60%; --ring: 24 82% 60%; }
+
+:root[data-accent="pink"]   { --primary: 328 76% 55%; --ring: 328 76% 55%; }
+.dark[data-accent="pink"]   { --primary: 328 70% 64%; --ring: 328 70% 64%; }
+
 @layer base {
   * {
     @apply border-border;
