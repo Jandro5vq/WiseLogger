@@ -7,7 +7,7 @@ import type { TaskWithTags } from '@/types/db'
 import { DateTimeInput } from '@/components/ui/date-time-input'
 import { Play, PenSquare, PlusBox, Note } from 'pixelarticons/react'
 import { useToast } from '@/components/ui/toast'
-import { loadBilled, saveBilled, billedKey, groupSignature, type BilledMap } from '@/lib/billed'
+import { loadBilled, saveBilled, billedKey, groupSignature, fetchBilledFromServer, markBilledOnServer, unmarkBilledOnServer, type BilledMap } from '@/lib/billed'
 
 function TrashIcon({ size = 16 }: { size?: number }) {
   return (
@@ -521,7 +521,9 @@ export function TaskList({
 }) {
   const [billed, setBilled] = useState<BilledMap>(new Map())
   useEffect(() => {
-    if (showBilledCheckbox) setBilled(loadBilled())
+    if (!showBilledCheckbox) return
+    setBilled(loadBilled())
+    fetchBilledFromServer().then(setBilled)
   }, [showBilledCheckbox])
 
   function toggleBilled(desc: string, segments: TaskWithTags[]) {
@@ -531,8 +533,10 @@ export function TaskList({
     const next = new Map(billed)
     if (next.get(key) === sig) {
       next.delete(key)
+      unmarkBilledOnServer(entryDate, desc)
     } else {
       next.set(key, sig)
+      markBilledOnServer(entryDate, desc, sig)
     }
     setBilled(next)
     saveBilled(next)

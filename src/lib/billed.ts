@@ -60,3 +60,33 @@ export function groupSignature(tasks: TaskWithTags[]): string {
     .join('\n')
   return djb2(parts)
 }
+
+export async function fetchBilledFromServer(): Promise<BilledMap> {
+  try {
+    const res = await fetch('/api/billed')
+    if (!res.ok) return loadBilled()
+    const rows = (await res.json()) as Array<{ date: string; description: string; signature: string }>
+    const map = new Map<string, string>()
+    for (const r of rows) map.set(billedKey(r.date, r.description), r.signature)
+    saveBilled(map)
+    return map
+  } catch {
+    return loadBilled()
+  }
+}
+
+export async function markBilledOnServer(date: string, description: string, signature: string): Promise<void> {
+  await fetch('/api/billed', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date, description, signature }),
+  })
+}
+
+export async function unmarkBilledOnServer(date: string, description: string): Promise<void> {
+  await fetch('/api/billed', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date, description }),
+  })
+}
