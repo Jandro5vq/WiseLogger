@@ -8,7 +8,7 @@ import type { TaskWithTags } from '@/types/db'
 import { ArrowLeftBox, ArrowRightBox } from 'pixelarticons/react'
 import { useToast } from '@/components/ui/toast'
 
-import { loadBilled, saveBilled, billedKey, groupSignature, type BilledMap } from '@/lib/billed'
+import { loadBilled, saveBilled, billedKey, groupSignature, fetchBilledFromServer, markBilledOnServer, unmarkBilledOnServer, type BilledMap } from '@/lib/billed'
 
 // Use local date to avoid UTC offset shifting the day
 function localDate(d: Date): string {
@@ -229,14 +229,20 @@ export function WeekView() {
   useEffect(() => {
     setShowWeekends(localStorage.getItem(WEEKEND_KEY) === 'true')
     setBilled(loadBilled())
+    fetchBilledFromServer().then(setBilled)
   }, [])
 
   const toggleBilled = useCallback((date: string, description: string, signature: string) => {
     setBilled((prev) => {
       const next = new Map(prev)
       const key = billedKey(date, description)
-      if (next.get(key) === signature) next.delete(key)
-      else next.set(key, signature)
+      if (next.get(key) === signature) {
+        next.delete(key)
+        unmarkBilledOnServer(date, description)
+      } else {
+        next.set(key, signature)
+        markBilledOnServer(date, description, signature)
+      }
       saveBilled(next)
       return next
     })

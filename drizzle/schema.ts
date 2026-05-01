@@ -1,4 +1,4 @@
-import { sqliteTable, text, integer, unique } from 'drizzle-orm/sqlite-core'
+import { sqliteTable, text, integer, unique, index } from 'drizzle-orm/sqlite-core'
 
 export const users = sqliteTable('users', {
   id: text('id').primaryKey(),
@@ -91,6 +91,24 @@ export const entryBreaks = sqliteTable('entry_breaks', {
   label: text('label'),
   fromRuleId: text('from_rule_id'), // which rule generated this (info only)
 })
+
+export const billedGroups = sqliteTable(
+  'billed_groups',
+  {
+    id: text('id').primaryKey(),
+    userId: text('user_id')
+      .notNull()
+      .references(() => users.id, { onDelete: 'cascade' }),
+    date: text('date').notNull(), // YYYY-MM-DD
+    description: text('description').notNull(),
+    signature: text('signature').notNull(),
+    billedAt: integer('billed_at').notNull(),
+  },
+  (t) => ({
+    uniqueUserDateDesc: unique().on(t.userId, t.date, t.description),
+    idxUserId: index('idx_billed_groups_user_id').on(t.userId),
+  })
+)
 
 export const invitations = sqliteTable('invitations', {
   id: text('id').primaryKey(),
