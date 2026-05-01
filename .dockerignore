@@ -6,6 +6,11 @@ node_modules
 *.db-shm
 *.db-wal
 npm-debug.log*
+*.log
 .git
 .gitignore
+.github
 README.md
+docs
+drizzle.config.ts
+drizzle/*.ts

@@ -15,6 +15,17 @@ export function performBackup(): void {
   // VACUUM INTO creates a clean single-file backup (handles WAL correctly)
   sqlite.prepare(`VACUUM INTO ?`).run(backupPath)
   console.log(`[backup] Created backup: ${backupPath}`)
+
+  const MAX_DAYS = 30
+  const cutoff = Date.now() - MAX_DAYS * 86_400_000
+  const stale = fs
+    .readdirSync(backupDir)
+    .filter((f) => f.startsWith('wiselogger-') && f.endsWith('.db'))
+    .filter((f) => fs.statSync(path.join(backupDir, f)).mtimeMs < cutoff)
+  for (const f of stale) {
+    fs.unlinkSync(path.join(backupDir, f))
+    console.log(`[backup] Deleted old backup: ${f}`)
+  }
 }
 
 export function scheduleBackup(): void {
