@@ -38,11 +38,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // Optionally adjust the first/last task to match the new workday boundaries
   const entryTasks = listTasksForEntry(params.id)
   if (body.adjustFirstTask && body.startTime && entryTasks.length > 0) {
-    updateTask(entryTasks[0].id, { startTime: body.startTime })
+    const first = entryTasks[0]
+    const newStartMs = new Date(body.startTime).getTime()
+    const firstEndMs = first.endTime ? new Date(first.endTime).getTime() : Infinity
+    if (newStartMs < firstEndMs) {
+      updateTask(first.id, { startTime: body.startTime })
+    }
   }
   if (body.adjustLastTask && body.endTime && entryTasks.length > 0) {
     const last = entryTasks[entryTasks.length - 1]
-    updateTask(last.id, { endTime: body.endTime })
+    const newEndMs = new Date(body.endTime).getTime()
+    const lastStartMs = new Date(last.startTime).getTime()
+    if (newEndMs > lastStartMs) {
+      updateTask(last.id, { endTime: body.endTime })
+    }
   }
 
   return NextResponse.json(updated)

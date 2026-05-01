@@ -2,6 +2,7 @@ import { getSession } from '@/lib/auth/session'
 import { getEntryByDate } from '@/lib/db/queries/entries'
 import { listTasksForEntry } from '@/lib/db/queries/tasks'
 import { getEntryBreaks } from '@/lib/db/queries/entry-breaks'
+import { breakToInterval } from '@/lib/business/breaks'
 import { parseTaskTags } from '@/types/db'
 import { EntryEditor } from '@/components/history/entry-editor'
 import { DayTimeline } from '@/components/dashboard/day-timeline'
@@ -34,7 +35,12 @@ export default async function HistoryDatePage({ params }: { params: { date: stri
         <DayTimeline tasks={sortedTasks} breaks={breaks} entryDate={date} />
       )}
 
-      <EntryEditor date={date} entry={entry} tasks={tasks} />
+      <EntryEditor
+        date={date}
+        entry={entry}
+        tasks={tasks}
+        breaks={entry ? breaks.map((b) => { const { startIso, endIso } = breakToInterval(b, date); return { startIso, endIso } }) : []}
+      />
     </div>
   )
 }

@@ -6,6 +6,8 @@ import { formatMinutes, isoToLocalInput } from '@/lib/utils'
 import type { Entry, TaskWithTags } from '@/types/db'
 import { TaskList } from '@/components/dashboard/task-list'
 import { DateTimeInput } from '@/components/ui/date-time-input'
+import { GapsAlert } from '@/components/ui/gaps-alert'
+import { Note } from 'pixelarticons/react'
 
 function useAdjustPref(key: string): [boolean, (v: boolean) => void] {
   const [value, setValue] = useState(true)
@@ -24,6 +26,7 @@ interface EntryEditorProps {
   date: string
   entry: Entry | undefined
   tasks: TaskWithTags[]
+  breaks?: { startIso: string; endIso: string }[]
 }
 
 function AddTaskForm({ entryId, onAdded }: { entryId: string; onAdded: () => void }) {
@@ -173,7 +176,7 @@ function WorkdayHoursEditor({ entry }: { entry: Entry }) {
   )
 }
 
-export function EntryEditor({ date, entry, tasks }: EntryEditorProps) {
+export function EntryEditor({ date, entry, tasks, breaks = [] }: EntryEditorProps) {
   const router = useRouter()
   const [notes, setNotes] = useState(entry?.notes ?? '')
   const [saving, setSaving] = useState(false)
@@ -222,11 +225,13 @@ export function EntryEditor({ date, entry, tasks }: EntryEditorProps) {
         <div className="rounded-lg border border-border bg-card p-4">
           <p className="text-xs text-muted-foreground">Balance</p>
 
-          <p className={`text-xl font-bold ${dayBalance >= 0 ? 'text-green-600 dark:text-green-400' : 'text-red-600 dark:text-red-400'}`}>
-            {dayBalance >= 0 ? '+' : ''}{formatMinutes(dayBalance)}
+          <p className={`text-xl font-bold ${dayBalance > 0 ? 'text-green-600 dark:text-green-400' : dayBalance < 0 ? 'text-red-600 dark:text-red-400' : 'text-muted-foreground'}`}>
+            {dayBalance !== 0 ? (dayBalance > 0 ? '+' : '') + formatMinutes(dayBalance) : '0h'}
           </p>
         </div>
       </div>
+
+      <GapsAlert tasks={completedTasks} breaks={breaks} />
 
       <div className="rounded-lg border border-border bg-card">
         <div className="flex items-center justify-between px-4 py-3 border-b border-border">
@@ -245,12 +250,12 @@ export function EntryEditor({ date, entry, tasks }: EntryEditorProps) {
               onAdded={() => { setShowAdd(false); router.refresh() }}
             />
           )}
-          <TaskList tasks={completedTasks} entryId={entry.id} />
+          <TaskList tasks={completedTasks} entryId={entry.id} allowResume={false} />
         </div>
       </div>
 
       <div className="rounded-lg border border-border bg-card p-4">
-        <h2 className="text-sm font-medium mb-2">Notas</h2>
+        <h2 className="text-sm font-medium mb-2 flex items-center gap-1.5"><Note width={16} height={16} />Notas</h2>
         <textarea
           value={notes}
           onChange={(e) => setNotes(e.target.value)}

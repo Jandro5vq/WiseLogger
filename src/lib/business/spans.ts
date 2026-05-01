@@ -1,7 +1,7 @@
 import { v4 as uuidv4 } from 'uuid'
 import { listTasksForEntry, updateTask, deleteTask, createTask } from '@/lib/db/queries/tasks'
 import { getEntryBreaks } from '@/lib/db/queries/entry-breaks'
-import { breakToInterval } from '@/lib/business/breaks'
+import { breakToInterval, type Interval } from '@/lib/business/breaks'
 
 /**
  * Splits/trims/deletes tasks that overlap with a newly added break interval.
@@ -18,7 +18,7 @@ export function splitTasksAroundBreak(
   userId: string,
   breakStartIso: string,
   breakEndIso: string
-): { updatedTaskIds: string[]; createdTaskIds: string[]; deletedTaskIds: string[] } {
+): { updatedTaskIds: string[]; createdTaskIds: string[]; deletedTaskIds: string[]; deletedDescriptions: string[] } {
   const breakStart = new Date(breakStartIso).getTime()
   const breakEnd = new Date(breakEndIso).getTime()
 
@@ -26,6 +26,7 @@ export function splitTasksAroundBreak(
   const updatedTaskIds: string[] = []
   const createdTaskIds: string[] = []
   const deletedTaskIds: string[] = []
+  const deletedDescriptions: string[] = []
 
   for (const task of tasks) {
     if (!task.endTime) continue // skip active task
@@ -37,6 +38,7 @@ export function splitTasksAroundBreak(
 
     if (taskStart >= breakStart && taskEnd <= breakEnd) {
       // Task fully inside break → delete
+      deletedDescriptions.push(task.description)
       deleteTask(task.id)
       deletedTaskIds.push(task.id)
     } else if (taskStart < breakStart && taskEnd <= breakEnd) {
@@ -64,7 +66,7 @@ export function splitTasksAroundBreak(
     }
   }
 
-  return { updatedTaskIds, createdTaskIds, deletedTaskIds }
+  return { updatedTaskIds, createdTaskIds, deletedTaskIds, deletedDescriptions }
 }
 
 /**
@@ -129,10 +131,19 @@ export function adjustPrecedingTask(entryId: string, newStartIso: string): boole
     if (!t.endTime) return false
     return new Date(t.startTime).getTime() < newStart && new Date(t.endTime).getTime() > newStart
   })
-  if (!precedingTask) return false
+  if (precedingTask) {
+    updateTask(precedingTask.id, { endTime: newStartIso })
+    return true
+  }
 
-  updateTask(precedingTask.id, { endTime: newStartIso })
-  return true
+  // Also close an active task that started before the new span's start
+  const activeTask = tasks.find((t) => !t.endTime && new Date(t.startTime).getTime() < newStart)
+  if (activeTask) {
+    updateTask(activeTask.id, { endTime: newStartIso })
+    return true
+  }
+
+  return false
 }
 
 /**
@@ -174,5 +185,128 @@ export function extendPreviousTaskOnBreakDelete(
   if (nextTask && nextTask.description === prevTask.description) {
     updateTask(prevTask.id, { endTime: nextTask.endTime })
     deleteTask(nextTask.id)
+  }
+}
+
+/**
+ * Slices [start, end] around a sorted list of break intervals,
+ * returning the non-break gaps as {start, end} ms-epoch pairs.
+ * Breaks that don't overlap the interval are ignored.
+ */
+export function splitIntervalAroundBreaks(
+  start: number,
+  end: number,
+  breakIntervals: Interval[]
+): { start: number; end: number }[] {
+  const overlapping = breakIntervals
+    .filter((b) => b.start < end && b.end > start)
+    .sort((a, b) => a.start - b.start)
+
+  const segments: { start: number; end: number }[] = []
+  let cursor = start
+
+  for (const b of overlapping) {
+    if (cursor < b.start) {
+      segments.push({ start: cursor, end: b.start })
+    }
+    cursor = Math.max(cursor, b.end)
+  }
+
+  if (cursor < end) {
+    segments.push({ start: cursor, end })
+  }
+
+  return segments
+}
+
+/**
+ * When editing a task's time range, trims any other completed tasks that
+ * overlap with [newStartIso, newEndIso] to make room for the edit:
+ *   - A task whose end falls inside the new range → trim its end to newStart
+ *   - A task whose start falls inside the new range → trim its start to newEnd
+ *   - A task fully contained inside the new range → deleted
+ *
+ * Does NOT touch the task being edited (excluded by taskId).
+ * Returns IDs of affected tasks.
+ */
+export function adjustAdjacentTasksForEdit(
+  entryId: string,
+  taskId: string,
+  newStartIso: string,
+  newEndIso: string
+): { affectedIds: string[]; deletedDescriptions: string[] } {
+  const newStart = new Date(newStartIso).getTime()
+  const newEnd = new Date(newEndIso).getTime()
+  const tasks = listTasksForEntry(entryId)
+  const affectedIds: string[] = []
+  const deletedDescriptions: string[] = []
+
+  for (const t of tasks) {
+    if (t.id === taskId || !t.endTime) continue
+    const tStart = new Date(t.startTime).getTime()
+    const tEnd = new Date(t.endTime).getTime()
+    if (tEnd <= newStart || tStart >= newEnd) continue // no overlap
+
+    if (tStart >= newStart && tEnd <= newEnd) {
+      // Fully contained → delete
+      deletedDescriptions.push(t.description)
+      deleteTask(t.id)
+    } else if (tStart < newStart && tEnd <= newEnd) {
+      // Tail overlaps → trim end
+      updateTask(t.id, { endTime: newStartIso })
+    } else if (tStart >= newStart && tEnd > newEnd) {
+      // Head overlaps → trim start
+      updateTask(t.id, { startTime: newEndIso })
+    } else {
+      // Wraps around: split it — trim end to newStart, create remainder after newEnd
+      updateTask(t.id, { endTime: newStartIso })
+      createTask({
+        id: uuidv4(),
+        entryId,
+        userId: t.userId,
+        startTime: newEndIso,
+        endTime: t.endTime,
+        description: t.description,
+        tags: t.tags,
+        notes: t.notes ?? undefined,
+      })
+    }
+    affectedIds.push(t.id)
+  }
+
+  return { affectedIds, deletedDescriptions }
+}
+
+/**
+ * Fuses spans of the same task that are exactly contiguous (endTime of one === startTime of next).
+ * Called after any operation that may leave adjacent same-description spans touching.
+ */
+export function mergeContiguousSpans(entryId: string): void {
+  const tasks = listTasksForEntry(entryId)
+  const completed = tasks.filter((t) => t.endTime)
+
+  // Group by description
+  const groups = new Map<string, typeof completed>()
+  for (const t of completed) {
+    if (!groups.has(t.description)) groups.set(t.description, [])
+    groups.get(t.description)!.push(t)
+  }
+
+  for (const spans of Array.from(groups.values())) {
+    if (spans.length < 2) continue
+    spans.sort((a, b) => new Date(a.startTime).getTime() - new Date(b.startTime).getTime())
+
+    let i = 0
+    while (i < spans.length - 1) {
+      const curr = spans[i]
+      const next = spans[i + 1]
+      if (new Date(curr.endTime!).getTime() === new Date(next.startTime).getTime()) {
+        updateTask(curr.id, { endTime: next.endTime })
+        deleteTask(next.id)
+        spans.splice(i + 1, 1)
+      } else {
+        i++
+      }
+    }
   }
 }

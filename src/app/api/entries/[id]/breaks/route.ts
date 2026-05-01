@@ -7,7 +7,7 @@ import { getSession } from '@/lib/auth/session'
 import { getEntryById } from '@/lib/db/queries/entries'
 import { getEntryBreaks, createEntryBreak } from '@/lib/db/queries/entry-breaks'
 import { breakToInterval, detectOverlap } from '@/lib/business/breaks'
-import { splitTasksAroundBreak } from '@/lib/business/spans'
+import { splitTasksAroundBreak, mergeContiguousSpans } from '@/lib/business/spans'
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession(_req)
@@ -60,6 +60,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   // Split/trim any tasks that overlap with the new break
   const affected = splitTasksAroundBreak(params.id, session.user.id, startIso, endIso)
+  mergeContiguousSpans(params.id)
 
-  return NextResponse.json({ break: b, affected }, { status: 201 })
+  return NextResponse.json({ break: b, deletedDescriptions: affected.deletedDescriptions }, { status: 201 })
 }

@@ -36,7 +36,7 @@ function BreakForm({
 }: {
   initial?: EntryBreak
   entryDate: string
-  onSave: (b: EntryBreak) => void
+  onSave: (b: EntryBreak, deletedDescriptions: string[]) => void
   onCancel: () => void
 }) {
   const [breakStart, setBreakStart] = useState(() => initial ? toLocalHHMM(initial.breakStart) : '')
@@ -62,7 +62,7 @@ function BreakForm({
       })
       const data = await res.json()
       setSaving(false)
-      if (res.ok) onSave(data)
+      if (res.ok) onSave(data.break, data.deletedDescriptions ?? [])
     }
   }
 
@@ -138,6 +138,13 @@ export function BreaksPanel({
 
   const total = breaks.reduce((s, b) => s + b.durationMinutes, 0)
 
+  function notifyPisadas(descriptions: string[]) {
+    const unique = Array.from(new Set(descriptions))
+    for (const desc of unique) {
+      toast.info(`«${desc}» fue eliminada al quedar completamente cubierta`)
+    }
+  }
+
   async function addBreak(e: React.FormEvent) {
     e.preventDefault()
     setAdding(true)
@@ -153,7 +160,8 @@ export function BreaksPanel({
     const data = await res.json()
     setAdding(false)
     if (res.ok) {
-      setBreaks((prev) => [...prev, data])
+      setBreaks((prev) => [...prev, data.break])
+      notifyPisadas(data.deletedDescriptions ?? [])
       setAddStart('')
       setAddDuration('30')
       setAddLabel('')
@@ -169,7 +177,8 @@ export function BreaksPanel({
     router.refresh()
   }
 
-  function handleEdited(updated: EntryBreak) {
+  function handleEdited(updated: EntryBreak, deletedDescriptions: string[]) {
+    notifyPisadas(deletedDescriptions)
     setBreaks((prev) => prev.map((b) => (b.id === updated.id ? updated : b)))
     setEditingId(null)
     router.refresh()

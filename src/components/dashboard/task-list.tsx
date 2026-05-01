@@ -1,17 +1,27 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { formatMinutes, isoToLocalInput } from '@/lib/utils'
 import type { TaskWithTags } from '@/types/db'
 import { DateTimeInput } from '@/components/ui/date-time-input'
-import { Play, PenSquare, Cancel } from 'pixelarticons/react'
+import { Play, PenSquare, PlusBox, Note } from 'pixelarticons/react'
 import { useToast } from '@/components/ui/toast'
+import { loadBilled, saveBilled, billedKey, groupSignature, type BilledMap } from '@/lib/billed'
+
+function TrashIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} fill="currentColor" viewBox="0 0 24 24">
+      <path d="M18 22H6V20H18V22ZM9 6H15V4H17V6H22V8H20V20H18V8H6V20H4V8H2V6H7V4H9V6ZM15 4H9V2H15V4Z" />
+    </svg>
+  )
+}
 
 // ─── edit form for a single segment ──────────────────────────────────────────
 
 function EditTaskForm({ task, onDone, siblingIds }: { task: TaskWithTags; onDone: () => void; siblingIds?: string[] }) {
   const router = useRouter()
+  const toast = useToast()
   const [description, setDescription] = useState(task.description)
   const [notes, setNotes] = useState(task.notes ?? '')
   const [tagsInput, setTagsInput] = useState(task.tags.join(', '))
@@ -41,6 +51,11 @@ function EditTaskForm({ task, onDone, siblingIds }: { task: TaskWithTags; onDone
       const data = await res.json()
       setError(data.error ?? 'Error al guardar')
       return
+    }
+    const data = await res.json()
+    const unique = Array.from(new Set<string>(data.deletedDescriptions ?? []))
+    for (const desc of unique) {
+      toast.info(`«${desc}» fue eliminada al quedar completamente cubierta`)
     }
     // Propagate notes to sibling spans so they stay in sync
     const noteVal = notes.trim() || null
@@ -116,6 +131,88 @@ function EditTaskForm({ task, onDone, siblingIds }: { task: TaskWithTags; onDone
   )
 }
 
+// ─── add span form ────────────────────────────────────────────────────────────
+
+function AddSpanForm({
+  entryId,
+  description,
+  tags,
+  notes,
+  onDone,
+}: {
+  entryId: string
+  description: string
+  tags: string[]
+  notes: string | null
+  onDone: () => void
+}) {
+  const router = useRouter()
+  const toast = useToast()
+  const [startTime, setStartTime] = useState('')
+  const [endTime, setEndTime] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  async function save(e: React.FormEvent) {
+    e.preventDefault()
+    if (!startTime || !endTime) return
+    setSaving(true)
+    setError('')
+    const res = await fetch(`/api/entries/${entryId}/tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        description,
+        tags,
+        notes,
+        startTime: new Date(startTime).toISOString(),
+        endTime: new Date(endTime).toISOString(),
+      }),
+    })
+    const data = await res.json()
+    setSaving(false)
+    if (!res.ok) {
+      setError(data.error ?? 'Error al guardar')
+      return
+    }
+    const unique = Array.from(new Set<string>(data.deletedDescriptions ?? []))
+    for (const desc of unique) {
+      toast.info(`«${desc}» fue eliminada al quedar completamente cubierta`)
+    }
+    onDone()
+    router.refresh()
+  }
+
+  return (
+    <form onSubmit={save} className="rounded-lg border border-primary/40 bg-card p-3 space-y-2 mt-1">
+      <p className="text-xs text-muted-foreground">Nueva sesión para <span className="font-medium text-foreground">{description}</span></p>
+      <div className="grid grid-cols-2 gap-2">
+        <div>
+          <label className="text-xs text-muted-foreground">Inicio</label>
+          <DateTimeInput value={startTime} onChange={setStartTime} required />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground">Fin</label>
+          <DateTimeInput value={endTime} onChange={setEndTime} required />
+        </div>
+      </div>
+      {error && <p className="text-xs text-destructive">{error}</p>}
+      <div className="flex gap-2 pt-1">
+        <button
+          type="submit"
+          disabled={saving}
+          className="rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        >
+          {saving ? 'Guardando…' : 'Añadir sesión'}
+        </button>
+        <button type="button" onClick={onDone} className="rounded border border-border px-3 py-1 text-xs hover:bg-accent">
+          Cancelar
+        </button>
+      </div>
+    </form>
+  )
+}
+
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 function fmtTime(iso: string) {
@@ -137,11 +234,17 @@ function TaskGroup({
   segments,
   entryId,
   activeTaskId,
+  allowResume = true,
+  isBilled,
+  onToggleBilled,
 }: {
   description: string
   segments: TaskWithTags[]
   entryId: string
   activeTaskId?: string
+  allowResume?: boolean
+  isBilled?: boolean
+  onToggleBilled?: () => void
 }) {
   const router = useRouter()
   const toast = useToast()
@@ -150,6 +253,7 @@ function TaskGroup({
   const [editingNotes, setEditingNotes] = useState(false)
   const [notesValue, setNotesValue] = useState(() => segments.find((s) => s.notes)?.notes ?? '')
   const [savingNotes, setSavingNotes] = useState(false)
+  const [addingSpan, setAddingSpan] = useState(false)
 
   const allTags = Array.from(new Set(segments.flatMap((t) => t.tags)))
   const total = totalMs(segments)
@@ -206,7 +310,7 @@ function TaskGroup({
   }
 
   return (
-    <div className="rounded-lg border border-border bg-card overflow-hidden">
+    <div className={`rounded-lg border border-border bg-card overflow-hidden${isBilled ? ' opacity-60' : ''}`}>
       {/* summary row — entire row is clickable to expand */}
       <div
         role={spans > 1 ? 'button' : undefined}
@@ -215,20 +319,32 @@ function TaskGroup({
         className="flex items-center justify-between px-3 py-2.5 gap-3 cursor-pointer hover:bg-accent/50 transition-colors"
         onClick={() => { if (spans > 1) setExpanded((v) => !v) }}
       >
-        <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium truncate" title={description}>{description}</p>
-          <div className="flex items-center gap-2 mt-0.5 flex-wrap">
-            {allTags.map((tag) => (
-              <span key={tag} className="text-xs bg-secondary rounded px-1.5 py-0.5">{tag}</span>
-            ))}
-            <span className="text-xs font-semibold text-foreground tabular-nums">
-              {formatMinutes(total / 60000)}
-            </span>
-            {spans > 1 && (
-              <span className="text-xs text-muted-foreground">
-                {spans} sesiones
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          {onToggleBilled !== undefined && (
+            <input
+              type="checkbox"
+              checked={!!isBilled}
+              onChange={(e) => { e.stopPropagation(); onToggleBilled() }}
+              onClick={(e) => e.stopPropagation()}
+              title="Marcar como imputada"
+              className="h-3 w-3 rounded border-muted-foreground/40 accent-primary shrink-0 cursor-pointer"
+            />
+          )}
+          <div className="min-w-0">
+            <p className={`text-sm font-medium truncate${isBilled ? ' line-through' : ''}`} title={description}>{description}</p>
+            <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+              {allTags.map((tag) => (
+                <span key={tag} className="text-xs bg-secondary rounded px-1.5 py-0.5">{tag}</span>
+              ))}
+              <span className="text-xs font-semibold text-foreground tabular-nums">
+                {formatMinutes(total / 60000)}
               </span>
-            )}
+              {spans > 1 && (
+                <span className="text-xs text-muted-foreground">
+                  {spans} sesiones
+                </span>
+              )}
+            </div>
           </div>
         </div>
 
@@ -236,7 +352,7 @@ function TaskGroup({
           {isActive && (
             <span className="text-xs text-green-500 font-medium px-1">en curso</span>
           )}
-          {!isActive && (
+          {!isActive && allowResume && (
             <button
               onClick={resume}
               className="text-muted-foreground hover:text-primary transition-colors p-0.5"
@@ -245,15 +361,20 @@ function TaskGroup({
               <Play width={16} height={16} />
             </button>
           )}
+          <button
+            onClick={(e) => { e.stopPropagation(); setAddingSpan((v) => !v) }}
+            className="text-muted-foreground hover:text-foreground transition-colors p-0.5"
+            title="Añadir sesión"
+          >
+            <PlusBox width={16} height={16} />
+          </button>
           {!groupNotes && !editingNotes && (
             <button
               onClick={(e) => { e.stopPropagation(); setNotesValue(''); setEditingNotes(true) }}
               className="text-muted-foreground hover:text-foreground transition-colors p-0.5"
               title="Añadir notas"
             >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 20h9"/><path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-              </svg>
+              <Note width={16} height={16} />
             </button>
           )}
           {spans === 1 && !isActive && (
@@ -270,10 +391,23 @@ function TaskGroup({
             className="text-muted-foreground hover:text-destructive transition-colors p-0.5"
             title="Eliminar"
           >
-            <Cancel width={16} height={16} />
+            <TrashIcon size={16} />
           </button>
         </div>
       </div>
+
+      {/* add span form */}
+      {addingSpan && (
+        <div className="px-3 pb-3">
+          <AddSpanForm
+            entryId={entryId}
+            description={description}
+            tags={allTags}
+            notes={groupNotes}
+            onDone={() => setAddingSpan(false)}
+          />
+        </div>
+      )}
 
       {/* inline edit for single-segment tasks */}
       {editingId && segments[0].id === editingId && (
@@ -355,7 +489,7 @@ function TaskGroup({
                       onClick={() => deleteSegment(seg.id)}
                       className="text-muted-foreground hover:text-destructive p-0.5"
                     >
-                      <Cancel width={14} height={14} />
+                      <TrashIcon size={14} />
                     </button>
                   </div>
                 </div>
@@ -374,11 +508,36 @@ export function TaskList({
   tasks,
   entryId,
   activeTaskId,
+  allowResume = true,
+  showBilledCheckbox,
+  entryDate,
 }: {
   tasks: TaskWithTags[]
   entryId: string
   activeTaskId?: string
+  allowResume?: boolean
+  showBilledCheckbox?: boolean
+  entryDate?: string
 }) {
+  const [billed, setBilled] = useState<BilledMap>(new Map())
+  useEffect(() => {
+    if (showBilledCheckbox) setBilled(loadBilled())
+  }, [showBilledCheckbox])
+
+  function toggleBilled(desc: string, segments: TaskWithTags[]) {
+    if (!entryDate) return
+    const key = billedKey(entryDate, desc)
+    const sig = groupSignature(segments)
+    const next = new Map(billed)
+    if (next.get(key) === sig) {
+      next.delete(key)
+    } else {
+      next.set(key, sig)
+    }
+    setBilled(next)
+    saveBilled(next)
+  }
+
   if (tasks.length === 0) {
     return (
       <p className="text-sm text-muted-foreground text-center py-8">
@@ -400,15 +559,22 @@ export function TaskList({
 
   return (
     <div className="space-y-1.5">
-      {order.map((desc) => (
-        <TaskGroup
-          key={desc}
-          description={desc}
-          segments={groups.get(desc)!}
-          entryId={entryId}
-          activeTaskId={activeTaskId}
-        />
-      ))}
+      {order.map((desc) => {
+        const segs = groups.get(desc)!
+        const isBilled = entryDate ? billed.get(billedKey(entryDate, desc)) === groupSignature(segs) : false
+        return (
+          <TaskGroup
+            key={desc}
+            description={desc}
+            segments={segs}
+            entryId={entryId}
+            activeTaskId={activeTaskId}
+            allowResume={allowResume}
+            isBilled={showBilledCheckbox ? isBilled : undefined}
+            onToggleBilled={showBilledCheckbox ? () => toggleBilled(desc, segs) : undefined}
+          />
+        )
+      })}
     </div>
   )
 }

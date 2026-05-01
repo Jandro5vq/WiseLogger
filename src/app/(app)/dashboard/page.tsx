@@ -11,6 +11,7 @@ import { DayControls } from '@/components/dashboard/day-controls'
 import { DayTimeline } from '@/components/dashboard/day-timeline'
 import { BreaksPanel } from '@/components/dashboard/breaks-panel'
 import { DailyNotes } from '@/components/dashboard/daily-notes'
+import { GapsAlert } from '@/components/ui/gaps-alert'
 import { listEntries, listUnclosedEntriesBefore, updateEntry } from '@/lib/db/queries/entries'
 import { autoSplitActiveTask } from '@/lib/business/spans'
 import { breakToInterval } from '@/lib/business/breaks'
@@ -32,7 +33,9 @@ export default async function DashboardPage() {
       const autoEndTime = new Date(endMs).toISOString()
       updateEntry(e.id, { endTime: autoEndTime })
       for (const t of listTasksForEntry(e.id).filter((t) => !t.endTime)) {
-        updateTask(t.id, { endTime: autoEndTime })
+        if (new Date(autoEndTime).getTime() > new Date(t.startTime).getTime()) {
+          updateTask(t.id, { endTime: autoEndTime })
+        }
       }
     }
   }
@@ -116,6 +119,8 @@ export default async function DashboardPage() {
 
       <BreaksPanel entryId={entry.id} entryDate={today} initialBreaks={breaks} />
 
+      <GapsAlert tasks={allTasksSorted} breaks={breakIntervals} />
+
       <div data-tour="tasks-panel" className="rounded-lg border border-border bg-card">
         <div className="border-b border-border px-4 py-3">
           <h2 className="text-sm font-medium">Tareas</h2>
@@ -125,6 +130,8 @@ export default async function DashboardPage() {
             tasks={allTasksSorted}
             entryId={entry.id}
             activeTaskId={activeTask?.id}
+            showBilledCheckbox
+            entryDate={today}
           />
           {!isClosed && (
             <NewTaskForm

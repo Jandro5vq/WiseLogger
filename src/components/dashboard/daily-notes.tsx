@@ -5,6 +5,7 @@ import StarterKit from '@tiptap/starter-kit'
 import Placeholder from '@tiptap/extension-placeholder'
 import createDOMPurify from 'dompurify'
 import { useEffect, useRef, useState, useCallback } from 'react'
+import { Note } from 'pixelarticons/react'
 
 // dompurify v3's default export is a factory — it has no `.sanitize` until
 // invoked with a window. Cache a browser-bound instance on first use.
@@ -90,7 +91,7 @@ export function DailyNotes({ entryId, initialNotes, recentEntries }: DailyNotesP
   return (
     <div data-tour="daily-notes" className="rounded-lg border border-border bg-card overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
-        <h2 className="text-sm font-medium">Notas</h2>
+        <h2 className="text-sm font-medium flex items-center gap-1.5"><Note width={16} height={16} />Notas</h2>
         {saving && <span className="text-xs text-muted-foreground">Guardando…</span>}
         {!saving && saved && <span className="text-xs text-green-600 dark:text-green-400">Guardado</span>}
       </div>

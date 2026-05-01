@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { isoToLocalInput } from '@/lib/utils'
 import { DateTimeInput } from '@/components/ui/date-time-input'
+import { useToast } from '@/components/ui/toast'
 
 interface Favorite {
   description: string
@@ -20,6 +21,7 @@ interface NewTaskFormProps {
 
 export function NewTaskForm({ entryId, activeTaskId, defaultStartTime }: NewTaskFormProps) {
   const router = useRouter()
+  const toast = useToast()
   const [open, setOpen] = useState(false)
   const [description, setDescription] = useState('')
   const [tagsInput, setTagsInput] = useState('')
@@ -87,6 +89,12 @@ export function NewTaskForm({ entryId, activeTaskId, defaultStartTime }: NewTask
     if (!res.ok) {
       setError(data.error || 'Failed to add task')
       return
+    }
+
+    const deleted: string[] = data.deletedDescriptions ?? []
+    const unique = Array.from(new Set(deleted))
+    for (const desc of unique) {
+      toast.info(`«${desc}» fue eliminada al quedar completamente cubierta`)
     }
 
     setDescription('')

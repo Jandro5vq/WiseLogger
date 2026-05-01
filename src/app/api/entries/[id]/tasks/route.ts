@@ -10,7 +10,7 @@ import { sqlite } from '@/lib/db'
 import { getEntryBreaks } from '@/lib/db/queries/entry-breaks'
 import { parseTaskTags } from '@/types/db'
 import { breakToInterval, buildEntryIntervals, detectOverlap } from '@/lib/business/breaks'
-import { adjustPrecedingTask } from '@/lib/business/spans'
+import { adjustPrecedingTask, splitIntervalAroundBreaks, adjustAdjacentTasksForEdit, mergeContiguousSpans } from '@/lib/business/spans'
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession(_req)
@@ -61,13 +61,43 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const { startIso, endIso } = breakToInterval(b, entry.date)
     return { start: new Date(startIso).getTime(), end: new Date(endIso).getTime() }
   })
+  let deletedDescriptions: string[] = []
+
   if (endTime) {
-    // Completed task: full interval overlap check
-    if (detectOverlap(breakIntervals, { start: tStart, end: new Date(endTime).getTime() })) {
-      return NextResponse.json(
-        { error: 'El intervalo se solapa con una pausa existente' },
-        { status: 400 }
-      )
+    const tEnd = new Date(endTime).getTime()
+    if (detectOverlap(breakIntervals, { start: tStart, end: tEnd })) {
+      // Completed task overlaps break(s) → split into multiple segments
+      const segments = splitIntervalAroundBreaks(tStart, tEnd, breakIntervals)
+      if (segments.length === 0) {
+        return NextResponse.json(
+          { error: 'El intervalo cae completamente dentro de una pausa' },
+          { status: 400 }
+        )
+      }
+
+      // Pisa tareas que queden completamente cubiertas por los nuevos segmentos
+      const { deletedDescriptions: dd } = adjustAdjacentTasksForEdit(params.id, '', effectiveStart, endTime)
+      deletedDescriptions = dd
+
+      adjustPrecedingTask(params.id, new Date(segments[0].start).toISOString())
+
+      const createdTasks = sqlite.transaction(() => {
+        return segments.map((seg) =>
+          createTask({
+            id: uuidv4(),
+            entryId: params.id,
+            userId: session.user.id,
+            startTime: new Date(seg.start).toISOString(),
+            endTime: new Date(seg.end).toISOString(),
+            description,
+            tags: JSON.stringify(tags ?? []),
+            notes: notes ?? null,
+          })
+        )
+      })()
+
+      mergeContiguousSpans(params.id)
+      return NextResponse.json({ task: parseTaskTags(createdTasks[0]), deletedDescriptions }, { status: 201 })
     }
   } else {
     // Active task: point-in-break check for startTime only
@@ -78,6 +108,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         { status: 400 }
       )
     }
+  }
+
+  // Pisa tareas que queden completamente cubiertas — solo para tareas completas
+  if (endTime) {
+    const { deletedDescriptions: dd } = adjustAdjacentTasksForEdit(params.id, '', effectiveStart, endTime)
+    deletedDescriptions = dd
   }
 
   // Truncate any preceding completed task that overlaps at the new task's startTime
@@ -115,5 +151,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     })
   })()
 
-  return NextResponse.json(parseTaskTags(task), { status: 201 })
+  mergeContiguousSpans(params.id)
+  return NextResponse.json({ task: parseTaskTags(task), deletedDescriptions }, { status: 201 })
 }
