@@ -54,3 +54,13 @@ export function listUnclosedEntriesBefore(userId: string, date: string) {
     .orderBy(entries.date)
     .all()
 }
+
+/** All users' unclosed entries from before `date`. Used by the auto-close cron. */
+export function listAllUnclosedEntriesBefore(date: string) {
+  return db
+    .select()
+    .from(entries)
+    .where(and(lt(entries.date, date), isNull(entries.endTime)))
+    .orderBy(entries.date)
+    .all()
+}

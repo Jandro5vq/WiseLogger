@@ -4,6 +4,9 @@ import withPWA from 'next-pwa'
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   output: 'standalone',
+  experimental: {
+    instrumentationHook: true,
+  },
   webpack: (config, { isServer }) => {
     if (isServer) {
       // better-sqlite3 is a native addon — must not be bundled by webpack

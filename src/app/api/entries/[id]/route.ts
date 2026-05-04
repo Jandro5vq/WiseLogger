@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { getEntryById, updateEntry, deleteEntry } from '@/lib/db/queries/entries'
 import { listTasksForEntry, updateTask } from '@/lib/db/queries/tasks'
+import { resolveExpectedMinutes } from '@/lib/business/schedule'
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession(_req)
@@ -31,6 +32,15 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const updates: Record<string, unknown> = {}
   for (const key of allowed) {
     if (key in body) updates[key] = body[key]
+  }
+
+  if ('dayOff' in body) {
+    if (body.dayOff === true) {
+      updates.expectedMinutes = 0
+      updates.endTime = entry.startTime ?? entry.date + 'T00:00:00.000Z'
+    } else {
+      updates.expectedMinutes = resolveExpectedMinutes(entry.userId, entry.date)
+    }
   }
 
   const updated = updateEntry(params.id, updates)

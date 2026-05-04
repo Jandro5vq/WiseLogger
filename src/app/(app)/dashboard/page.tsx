@@ -12,9 +12,10 @@ import { DayTimeline } from '@/components/dashboard/day-timeline'
 import { BreaksPanel } from '@/components/dashboard/breaks-panel'
 import { DailyNotes } from '@/components/dashboard/daily-notes'
 import { GapsAlert } from '@/components/ui/gaps-alert'
-import { listEntries, listUnclosedEntriesBefore, updateEntry } from '@/lib/db/queries/entries'
+import { listEntries, listUnclosedEntriesBefore } from '@/lib/db/queries/entries'
 import { autoSplitActiveTask } from '@/lib/business/spans'
 import { breakToInterval } from '@/lib/business/breaks'
+import { autoCloseEntry } from '@/lib/business/auto-close'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,19 +27,7 @@ export default async function DashboardPage() {
 
   // Auto-close any unclosed entries from previous days
   const unclosedPast = listUnclosedEntriesBefore(session.user.id, today)
-  for (const e of unclosedPast) {
-    if (e.startTime) {
-      const breakMins = getTotalBreakMinutes(e.id)
-      const endMs = new Date(e.startTime).getTime() + (e.expectedMinutes + breakMins) * 60_000
-      const autoEndTime = new Date(endMs).toISOString()
-      updateEntry(e.id, { endTime: autoEndTime })
-      for (const t of listTasksForEntry(e.id).filter((t) => !t.endTime)) {
-        if (new Date(autoEndTime).getTime() > new Date(t.startTime).getTime()) {
-          updateTask(t.id, { endTime: autoEndTime })
-        }
-      }
-    }
-  }
+  for (const e of unclosedPast) autoCloseEntry(e)
 
   // Auto-create entry so we always have an entryId available
   const entry = autoCreateEntry(session.user.id, today)
@@ -119,7 +108,7 @@ export default async function DashboardPage() {
 
       <BreaksPanel entryId={entry.id} entryDate={today} initialBreaks={breaks} />
 
-      <GapsAlert tasks={allTasksSorted} breaks={breakIntervals} />
+      {isClosed && <GapsAlert tasks={allTasksSorted} breaks={breakIntervals} />}
 
       <div data-tour="tasks-panel" className="rounded-lg border border-border bg-card">
         <div className="border-b border-border px-4 py-3">

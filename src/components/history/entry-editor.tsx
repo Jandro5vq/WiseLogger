@@ -180,7 +180,10 @@ export function EntryEditor({ date, entry, tasks, breaks = [] }: EntryEditorProp
   const router = useRouter()
   const [notes, setNotes] = useState(entry?.notes ?? '')
   const [saving, setSaving] = useState(false)
+  const [dayOffLoading, setDayOffLoading] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
+
+  const isDayOff = entry?.expectedMinutes === 0
 
   const workedMinutes = tasks
     .filter((t) => t.endTime)
@@ -203,6 +206,18 @@ export function EntryEditor({ date, entry, tasks, breaks = [] }: EntryEditorProp
     router.refresh()
   }
 
+  async function toggleDayOff() {
+    if (!entry) return
+    setDayOffLoading(true)
+    await fetch(`/api/entries/${entry.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dayOff: !isDayOff }),
+    })
+    setDayOffLoading(false)
+    router.refresh()
+  }
+
   if (!entry) {
     return (
       <div className="rounded-lg border border-border bg-card p-6 text-center text-muted-foreground">
@@ -215,7 +230,33 @@ export function EntryEditor({ date, entry, tasks, breaks = [] }: EntryEditorProp
 
   return (
     <div className="space-y-4">
-      <WorkdayHoursEditor entry={entry} />
+      {isDayOff ? (
+        <div className="rounded-lg border border-border bg-card p-4 flex items-center justify-between gap-4">
+          <div>
+            <p className="text-sm font-medium">Día libre / Festivo</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Este día está marcado como no laborable. No computa en el balance.</p>
+          </div>
+          <button
+            onClick={toggleDayOff}
+            disabled={dayOffLoading}
+            className="shrink-0 rounded bg-secondary px-3 py-1.5 text-xs font-medium hover:bg-secondary/80 disabled:opacity-50"
+          >
+            {dayOffLoading ? 'Guardando…' : 'Restaurar jornada'}
+          </button>
+        </div>
+      ) : (
+        <div className="flex justify-end">
+          <button
+            onClick={toggleDayOff}
+            disabled={dayOffLoading}
+            className="rounded border border-border bg-card px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground hover:border-foreground/30 disabled:opacity-50 transition-colors"
+          >
+            {dayOffLoading ? 'Guardando…' : 'Marcar como día libre'}
+          </button>
+        </div>
+      )}
+
+      {!isDayOff && <WorkdayHoursEditor entry={entry} />
 
       <div className="grid grid-cols-2 gap-4">
         <div className="rounded-lg border border-border bg-card p-4">

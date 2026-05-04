@@ -16,6 +16,7 @@ services:
       - INVITATION_EXPIRY_HOURS=${INVITATION_EXPIRY_HOURS:-72}
       - BACKUP_CRON=${BACKUP_CRON:-0 2 * * *}
       - BACKUP_PATH=/data/backups
+      - AUTO_CLOSE_CRON=${AUTO_CLOSE_CRON:-55 23 * * *}
     restart: unless-stopped
     deploy:
       resources:

@@ -25,5 +25,6 @@ export const env = {
   get INVITATION_EXPIRY_HOURS() { return parseInt(optional('INVITATION_EXPIRY_HOURS', '72'), 10) },
   get BACKUP_CRON() { return optional('BACKUP_CRON', '0 2 * * *') },
   get BACKUP_PATH() { return optional('BACKUP_PATH', '/data/backups') },
+  get AUTO_CLOSE_CRON() { return optional('AUTO_CLOSE_CRON', '55 23 * * *') },
   get NODE_ENV() { return optional('NODE_ENV', 'development') },
 } as const
