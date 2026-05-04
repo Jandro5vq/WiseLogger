@@ -54,6 +54,7 @@ export function DayControls({
 
   const [closingDay, setClosingDay] = useState(false)
   const [confirmClose, setConfirmClose] = useState(false)
+  const [closeError, setCloseError] = useState('')
 
   const [adjustFirst, setAdjustFirst] = useAdjustPref('wl:adjustFirstTask')
   const [adjustLast, setAdjustLast] = useAdjustPref('wl:adjustLastTask')
@@ -104,8 +105,8 @@ export function DayControls({
 
   async function handleCloseDay() {
     setClosingDay(true)
+    setCloseError('')
 
-    // Stop active task first, setting its endTime to the expected end time
     if (activeTaskId) {
       await fetch(`/api/tasks/${activeTaskId}`, {
         method: 'PATCH',
@@ -114,10 +115,15 @@ export function DayControls({
       })
     }
 
-    // Close the day
-    await fetch('/api/entries/today/close', { method: 'POST' })
-
+    const res = await fetch('/api/entries/today/close', { method: 'POST' })
     setClosingDay(false)
+
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      setCloseError(data.error ?? 'Error al cerrar la jornada')
+      return
+    }
+
     setConfirmClose(false)
     router.refresh()
   }
@@ -289,21 +295,25 @@ export function DayControls({
         {/* close day button */}
         {!editingStart && (
           confirmClose ? (
-            <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">¿Cerrar jornada?</span>
-              <button
-                onClick={handleCloseDay}
-                disabled={closingDay}
-                className="rounded bg-destructive px-3 py-1 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
-              >
-                {closingDay ? 'Cerrando…' : 'Confirmar'}
-              </button>
-              <button
-                onClick={() => setConfirmClose(false)}
-                className="rounded border border-border px-3 py-1 text-xs hover:bg-accent"
-              >
-                Cancelar
-              </button>
+            <div className="flex flex-col items-end gap-1">
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-muted-foreground">¿Cerrar jornada?</span>
+                <button
+                  onClick={handleCloseDay}
+                  disabled={closingDay}
+                  className="rounded bg-destructive px-3 py-1 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+                >
+                  {closingDay ? 'Cerrando…' : 'Confirmar'}
+                </button>
+                <button
+                  onClick={() => { setConfirmClose(false); setCloseError('') }}
+                  disabled={closingDay}
+                  className="rounded border border-border px-3 py-1 text-xs hover:bg-accent disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+              </div>
+              {closeError && <p className="text-xs text-destructive">{closeError}</p>}
             </div>
           ) : (
             <button
