@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useTransition } from 'react'
 import { TimeInput } from '@/components/ui/time-input'
 import { PenSquare, Cancel, Plus } from 'pixelarticons/react'
 import { useToast } from '@/components/ui/toast'
@@ -125,6 +125,7 @@ export function BreaksPanel({
   initialBreaks: EntryBreak[]
 }) {
   const router = useRouter()
+  const [, startTransition] = useTransition()
   const toast = useToast()
   const [breaks, setBreaks] = useState<EntryBreak[]>(initialBreaks)
   const [showAdd, setShowAdd] = useState(false)
@@ -166,7 +167,7 @@ export function BreaksPanel({
       setAddDuration('30')
       setAddLabel('')
       setShowAdd(false)
-      router.refresh()
+      startTransition(() => router.refresh())
     }
   }
 
@@ -174,14 +175,14 @@ export function BreaksPanel({
     const res = await fetch(`/api/breaks/${id}`, { method: 'DELETE' })
     if (!res.ok) { toast.error('Error al eliminar la pausa'); return }
     setBreaks((prev) => prev.filter((b) => b.id !== id))
-    router.refresh()
+    startTransition(() => router.refresh())
   }
 
   function handleEdited(updated: EntryBreak, deletedDescriptions: string[]) {
     notifyPisadas(deletedDescriptions)
     setBreaks((prev) => prev.map((b) => (b.id === updated.id ? updated : b)))
     setEditingId(null)
-    router.refresh()
+    startTransition(() => router.refresh())
   }
 
   return (

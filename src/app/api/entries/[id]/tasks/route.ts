@@ -1,6 +1,7 @@
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuidv4 } from 'uuid'
 import { getSession } from '@/lib/auth/session'
@@ -11,6 +12,15 @@ import { getEntryBreaks } from '@/lib/db/queries/entry-breaks'
 import { parseTaskTags } from '@/types/db'
 import { breakToInterval, buildEntryIntervals, detectOverlap } from '@/lib/business/breaks'
 import { adjustPrecedingTask, splitIntervalAroundBreaks, adjustAdjacentTasksForEdit, mergeContiguousSpans } from '@/lib/business/spans'
+import { parseBody } from '@/lib/api'
+
+const CreateTaskSchema = z.object({
+  description: z.string().min(1, 'La descripción es obligatoria'),
+  startTime: z.string().datetime({ message: 'startTime debe ser una fecha ISO válida' }).optional(),
+  endTime: z.string().datetime({ message: 'endTime debe ser una fecha ISO válida' }).optional(),
+  tags: z.array(z.string()).default([]),
+  notes: z.string().nullable().optional(),
+})
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession(_req)
@@ -34,16 +44,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
-  const body = await req.json()
-  const { description, startTime, endTime, tags, notes } = body as {
-    description: string
-    startTime?: string
-    endTime?: string
-    tags?: string[]
-    notes?: string | null
-  }
-
-  if (!description) return NextResponse.json({ error: 'La descripción es obligatoria' }, { status: 400 })
+  const raw = await req.json()
+  const parsed = parseBody(CreateTaskSchema, raw)
+  if (!parsed.ok) return parsed.response
+  const { description, startTime, endTime, tags, notes } = parsed.data
 
   const effectiveStart = startTime ?? new Date().toISOString()
   const tStart = new Date(effectiveStart).getTime()

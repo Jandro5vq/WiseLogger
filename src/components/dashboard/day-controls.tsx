@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { isoToLocalInput } from '@/lib/utils'
 import { DateTimeInput } from '@/components/ui/date-time-input'
@@ -43,6 +43,7 @@ export function DayControls({
   activeTaskId,
 }: DayControlsProps) {
   const router = useRouter()
+  const [, startTransition] = useTransition()
 
   const [editingStart, setEditingStart] = useState(false)
   const [startInput, setStartInput] = useState('')
@@ -83,7 +84,7 @@ export function DayControls({
     })
     setSavingStart(false)
     setEditingStart(false)
-    router.refresh()
+    startTransition(() => router.refresh())
   }
 
   async function saveEndTime(e: React.FormEvent) {
@@ -100,7 +101,7 @@ export function DayControls({
     })
     setSavingEnd(false)
     setEditingEnd(false)
-    router.refresh()
+    startTransition(() => router.refresh())
   }
 
   async function handleCloseDay() {
@@ -125,7 +126,7 @@ export function DayControls({
     }
 
     setConfirmClose(false)
-    router.refresh()
+    startTransition(() => router.refresh())
   }
 
   if (isClosed) {

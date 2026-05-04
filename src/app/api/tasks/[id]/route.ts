@@ -1,6 +1,7 @@
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+import { z } from 'zod'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { getTaskById, updateTask, deleteTask } from '@/lib/db/queries/tasks'
@@ -12,6 +13,15 @@ import { adjustAdjacentTasksForEdit, splitIntervalAroundBreaks, mergeContiguousS
 import { v4 as uuidv4 } from 'uuid'
 import { createTask } from '@/lib/db/queries/tasks'
 import { sqlite } from '@/lib/db'
+import { parseBody } from '@/lib/api'
+
+const PatchTaskSchema = z.object({
+  description: z.string().min(1, 'La descripción no puede estar vacía').optional(),
+  startTime: z.string().datetime({ message: 'startTime debe ser una fecha ISO válida' }).optional(),
+  endTime: z.string().datetime({ message: 'endTime debe ser una fecha ISO válida' }).nullable().optional(),
+  tags: z.array(z.string()).optional(),
+  notes: z.string().nullable().optional(),
+})
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession(req)
@@ -22,13 +32,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
-  const body = await req.json()
+  const raw = await req.json()
+  const parsed = parseBody(PatchTaskSchema, raw)
+  if (!parsed.ok) return parsed.response
+
+  const body = raw as Record<string, unknown>
+  const data = parsed.data
   const updates: Record<string, unknown> = {}
-  if ('description' in body) updates.description = body.description
-  if ('startTime' in body) updates.startTime = body.startTime
-  if ('endTime' in body) updates.endTime = body.endTime
-  if ('tags' in body) updates.tags = JSON.stringify(body.tags)
-  if ('notes' in body) updates.notes = body.notes ?? null
+  if ('description' in body) updates.description = data.description
+  if ('startTime' in body) updates.startTime = data.startTime
+  if ('endTime' in body) updates.endTime = data.endTime
+  if ('tags' in body) updates.tags = JSON.stringify(data.tags)
+  if ('notes' in body) updates.notes = data.notes ?? null
 
   // Validate and resolve overlaps when time fields changed
   const newStart = (updates.startTime as string | undefined) ?? task.startTime

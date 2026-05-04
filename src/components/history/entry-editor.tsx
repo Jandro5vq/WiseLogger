@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMinutes, isoToLocalInput } from '@/lib/utils'
 import type { Entry, TaskWithTags } from '@/types/db'
@@ -178,6 +178,7 @@ function WorkdayHoursEditor({ entry }: { entry: Entry }) {
 
 export function EntryEditor({ date, entry, tasks, breaks = [] }: EntryEditorProps) {
   const router = useRouter()
+  const [, startTransition] = useTransition()
   const [notes, setNotes] = useState(entry?.notes ?? '')
   const [saving, setSaving] = useState(false)
   const [dayOffLoading, setDayOffLoading] = useState(false)
@@ -203,7 +204,7 @@ export function EntryEditor({ date, entry, tasks, breaks = [] }: EntryEditorProp
       body: JSON.stringify({ notes }),
     })
     setSaving(false)
-    router.refresh()
+    startTransition(() => router.refresh())
   }
 
   async function toggleDayOff() {
@@ -215,7 +216,7 @@ export function EntryEditor({ date, entry, tasks, breaks = [] }: EntryEditorProp
       body: JSON.stringify({ dayOff: !isDayOff }),
     })
     setDayOffLoading(false)
-    router.refresh()
+    startTransition(() => router.refresh())
   }
 
   if (!entry) {
@@ -256,7 +257,7 @@ export function EntryEditor({ date, entry, tasks, breaks = [] }: EntryEditorProp
         </div>
       )}
 
-      {!isDayOff && <WorkdayHoursEditor entry={entry} />
+      {!isDayOff && <WorkdayHoursEditor entry={entry} />}
 
       <div className="grid grid-cols-2 gap-4">
         <div className="rounded-lg border border-border bg-card p-4">
@@ -288,10 +289,10 @@ export function EntryEditor({ date, entry, tasks, breaks = [] }: EntryEditorProp
           {showAdd && (
             <AddTaskForm
               entryId={entry.id}
-              onAdded={() => { setShowAdd(false); router.refresh() }}
+              onAdded={() => { setShowAdd(false); startTransition(() => router.refresh()) }}
             />
           )}
-          <TaskList tasks={completedTasks} entryId={entry.id} allowResume={false} />
+          <TaskList tasks={completedTasks} entryId={entry.id} allowResume={false} entryDate={date} />
         </div>
       </div>
 

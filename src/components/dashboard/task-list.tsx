@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useTransition } from 'react'
 import { formatMinutes, isoToLocalInput } from '@/lib/utils'
 import type { TaskWithTags } from '@/types/db'
 import { DateTimeInput } from '@/components/ui/date-time-input'
@@ -21,6 +21,7 @@ function TrashIcon({ size = 16 }: { size?: number }) {
 
 function EditTaskForm({ task, onDone, siblingIds }: { task: TaskWithTags; onDone: () => void; siblingIds?: string[] }) {
   const router = useRouter()
+  const [, startTransition] = useTransition()
   const toast = useToast()
   const [description, setDescription] = useState(task.description)
   const [notes, setNotes] = useState(task.notes ?? '')
@@ -71,7 +72,7 @@ function EditTaskForm({ task, onDone, siblingIds }: { task: TaskWithTags; onDone
       )
     }
     onDone()
-    router.refresh()
+    startTransition(() => router.refresh())
   }
 
   return (
@@ -147,6 +148,7 @@ function AddSpanForm({
   onDone: () => void
 }) {
   const router = useRouter()
+  const [, startTransition] = useTransition()
   const toast = useToast()
   const [startTime, setStartTime] = useState('')
   const [endTime, setEndTime] = useState('')
@@ -180,7 +182,7 @@ function AddSpanForm({
       toast.info(`«${desc}» fue eliminada al quedar completamente cubierta`)
     }
     onDone()
-    router.refresh()
+    startTransition(() => router.refresh())
   }
 
   return (
@@ -247,6 +249,7 @@ function TaskGroup({
   onToggleBilled?: () => void
 }) {
   const router = useRouter()
+  const [, startTransition] = useTransition()
   const toast = useToast()
   const [expanded, setExpanded] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
@@ -276,19 +279,19 @@ function TaskGroup({
     )
     setSavingNotes(false)
     setEditingNotes(false)
-    router.refresh()
+    startTransition(() => router.refresh())
   }
 
   async function deleteSegment(id: string) {
     const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
     if (!res.ok) { toast.error('Error al eliminar la tarea'); return }
-    router.refresh()
+    startTransition(() => router.refresh())
   }
 
   async function deleteAll() {
     const results = await Promise.all(segments.map((t) => fetch(`/api/tasks/${t.id}`, { method: 'DELETE' })))
     if (results.some((r) => !r.ok)) toast.error('Error al eliminar algunas tareas')
-    router.refresh()
+    startTransition(() => router.refresh())
   }
 
   async function resume(e: React.MouseEvent) {
@@ -306,7 +309,7 @@ function TaskGroup({
         startTime: new Date().toISOString(),
       }),
     })
-    router.refresh()
+    startTransition(() => router.refresh())
   }
 
   return (

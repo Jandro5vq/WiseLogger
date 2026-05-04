@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatElapsed, todayISO, isoToLocalInput } from '@/lib/utils'
 import { DateTimeInput } from '@/components/ui/date-time-input'
@@ -16,7 +16,9 @@ interface ActiveTaskTimerProps {
 
 export function ActiveTaskTimer({ task, loadedDate, entryId, breaks }: ActiveTaskTimerProps) {
   const router = useRouter()
+  const [, startTransition] = useTransition()
   const [elapsedMs, setElapsedMs] = useState(0)
+  const [stopped, setStopped] = useState(false)
   const [stopping, setStopping] = useState(false)
   const [editing, setEditing] = useState(false)
   const [editDesc, setEditDesc] = useState(task.description)
@@ -93,14 +95,15 @@ export function ActiveTaskTimer({ task, loadedDate, entryId, breaks }: ActiveTas
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ description: task.description, tags: task.tags, startTime }),
     })
-    router.refresh()
+    startTransition(() => router.refresh())
   }
 
   async function stopTask() {
+    setStopped(true)
     setStopping(true)
     await fetch(`/api/tasks/${task.id}/stop`, { method: 'POST' })
     setStopping(false)
-    router.refresh()
+    startTransition(() => router.refresh())
   }
 
   async function saveEdit(e: React.FormEvent) {
@@ -124,8 +127,10 @@ export function ActiveTaskTimer({ task, loadedDate, entryId, breaks }: ActiveTas
       return
     }
     setEditing(false)
-    router.refresh()
+    startTransition(() => router.refresh())
   }
+
+  if (stopped) return null
 
   // ── In-break UI ─────────────────────────────────────────────────────────────
   if (breakDisplay) {
