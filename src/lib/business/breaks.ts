@@ -2,35 +2,10 @@ import { v4 as uuidv4 } from 'uuid'
 import { getBreakRules } from '@/lib/db/queries/break-rules'
 import { getEntryBreaks, createEntryBreak, getEntryBreakById } from '@/lib/db/queries/entry-breaks'
 import { listTasksForEntry } from '@/lib/db/queries/tasks'
+import { hhmmToUTC } from '@/lib/tz'
 
-/**
- * Convert a local HH:MM time on a given YYYY-MM-DD date to a UTC ISO string,
- * using the provided IANA timezone.
- * Falls back to treating HH:MM as server local time if the timezone is invalid.
- */
-export function hhmmToUTC(dateStr: string, timeStr: string, timezone: string): string {
-  try {
-    // Build a "naive" UTC stamp treating the input as if it were UTC
-    const naive = new Date(`${dateStr}T${timeStr}:00Z`)
-    // Determine what local time that UTC moment reads as in the target timezone
-    const parts = new Intl.DateTimeFormat('en-US', {
-      timeZone: timezone,
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: false,
-    }).formatToParts(naive)
-    const p: Record<string, number> = {}
-    for (const { type, value } of parts) p[type] = parseInt(value)
-    const localH = (p.hour ?? 0) % 24  // some engines emit 24 for midnight
-    const [wantedH, wantedM] = timeStr.split(':').map(Number)
-    // Shift the naive stamp so its local representation equals the desired HH:MM
-    const offsetMs = (localH - wantedH) * 3_600_000 + ((p.minute ?? 0) - wantedM) * 60_000
-    return new Date(naive.getTime() - offsetMs).toISOString()
-  } catch (e) {
-    console.error('hhmmToUTC: invalid timezone or date, falling back to server local time', { dateStr, timeStr, timezone }, e)
-    return new Date(`${dateStr}T${timeStr}:00`).toISOString()
-  }
-}
+// Re-export for existing importers.
+export { hhmmToUTC }
 
 // ─── interval helpers ─────────────────────────────────────────────────────────
 

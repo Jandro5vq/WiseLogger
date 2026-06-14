@@ -2,20 +2,24 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { formatElapsed, todayISO, isoToLocalInput } from '@/lib/utils'
+import { formatElapsed, isoToLocalInput } from '@/lib/utils'
+import { dateStringInTz } from '@/lib/tz'
 import { DateTimeInput } from '@/components/ui/date-time-input'
 import { useToast } from '@/components/ui/toast'
 import { PenSquare } from 'pixelarticons/react'
 import type { TaskWithTags } from '@/types/db'
+import type { BreakInterval } from '@/lib/business/break-math'
 
 interface ActiveTaskTimerProps {
   task: TaskWithTags
   loadedDate: string
   entryId: string
-  breaks: { startIso: string; endIso: string }[]
+  breaks: BreakInterval[]
+  /** User's IANA timezone — drives the day-rollover refresh check. */
+  timezone: string
 }
 
-export function ActiveTaskTimer({ task, loadedDate, entryId, breaks }: ActiveTaskTimerProps) {
+export function ActiveTaskTimer({ task, loadedDate, entryId, breaks, timezone }: ActiveTaskTimerProps) {
   const router = useRouter()
   const toast = useToast()
   const [, startTransition] = useTransition()
@@ -66,7 +70,7 @@ export function ActiveTaskTimer({ task, loadedDate, entryId, breaks }: ActiveTas
       }
 
       setElapsedMs(now - new Date(task.startTime).getTime())
-      if (todayISO() !== loadedDate) router.refresh()
+      if (dateStringInTz(new Date(now), timezone) !== loadedDate) router.refresh()
     }
 
     tick()

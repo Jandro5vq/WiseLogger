@@ -1,6 +1,8 @@
 import { db } from '@/lib/db'
 import { entries } from '@db/schema'
 import { eq, and, gte, lte, lt, isNull } from 'drizzle-orm'
+// listAllUnclosedEntriesBefore was removed: auto-close now iterates users per their
+// own timezone (see lib/business/auto-close.ts) instead of a single UTC cutoff.
 
 export function getEntryById(id: string) {
   return db.select().from(entries).where(eq(entries.id, id)).get()
@@ -51,16 +53,6 @@ export function listUnclosedEntriesBefore(userId: string, date: string) {
     .select()
     .from(entries)
     .where(and(eq(entries.userId, userId), lt(entries.date, date), isNull(entries.endTime)))
-    .orderBy(entries.date)
-    .all()
-}
-
-/** All users' unclosed entries from before `date`. Used by the auto-close cron. */
-export function listAllUnclosedEntriesBefore(date: string) {
-  return db
-    .select()
-    .from(entries)
-    .where(and(lt(entries.date, date), isNull(entries.endTime)))
     .orderBy(entries.date)
     .all()
 }

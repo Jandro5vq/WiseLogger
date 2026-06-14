@@ -102,6 +102,7 @@ export default async function DashboardPage() {
           loadedDate={today}
           entryId={entry.id}
           breaks={breakIntervals}
+          timezone={session.user.timezone}
         />
       )}
 

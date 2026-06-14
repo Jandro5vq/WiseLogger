@@ -1,7 +1,9 @@
-import { listAllUnclosedEntriesBefore, updateEntry } from '@/lib/db/queries/entries'
+import { listUnclosedEntriesBefore, updateEntry } from '@/lib/db/queries/entries'
 import { listTasksForEntry, updateTask } from '@/lib/db/queries/tasks'
+import { listUsers } from '@/lib/db/queries/users'
 import { getEntryBreaks } from '@/lib/db/queries/entry-breaks'
 import { breakToInterval } from '@/lib/business/breaks'
+import { dateStringInTz } from '@/lib/tz'
 import { env } from '@/lib/env'
 import type { Entry } from '@/types/db'
 
@@ -48,14 +50,31 @@ export function autoCloseEntry(entry: Entry): void {
   console.log(`[auto-close] Closed: ${entry.date} (user ${entry.userId})`)
 }
 
+/**
+ * Closes every user's unclosed past entries, using each user's own timezone to
+ * decide what "before today" means. A user behind UTC who is still working late
+ * must not have their current day closed because the server clock already rolled over.
+ */
+function closeStaleEntriesForAllUsers(): number {
+  let processed = 0
+  const now = new Date()
+  for (const user of listUsers()) {
+    const userToday = dateStringInTz(now, user.timezone)
+    const unclosed = listUnclosedEntriesBefore(user.id, userToday)
+    for (const entry of unclosed) {
+      autoCloseEntry(entry)
+      processed++
+    }
+  }
+  return processed
+}
+
 /** Runs at startup to catch any entries missed by the cron (server downtime, etc.). */
 export function runStartupAutoClose(): void {
-  const today = new Date().toISOString().slice(0, 10)
   try {
-    const unclosed = listAllUnclosedEntriesBefore(today)
-    for (const entry of unclosed) autoCloseEntry(entry)
-    if (unclosed.length > 0) {
-      console.log(`[auto-close] Startup: processed ${unclosed.length} unclosed entr${unclosed.length === 1 ? 'y' : 'ies'}`)
+    const processed = closeStaleEntriesForAllUsers()
+    if (processed > 0) {
+      console.log(`[auto-close] Startup: processed ${processed} unclosed entr${processed === 1 ? 'y' : 'ies'}`)
     }
   } catch (err) {
     console.error('[auto-close] Startup run failed:', err)
@@ -70,10 +89,8 @@ export function scheduleAutoClose(): void {
   import('node-cron')
     .then((nodeCron) => {
       nodeCron.schedule(cron, () => {
-        const today = new Date().toISOString().slice(0, 10)
         try {
-          const unclosed = listAllUnclosedEntriesBefore(today)
-          for (const entry of unclosed) autoCloseEntry(entry)
+          closeStaleEntriesForAllUsers()
         } catch (err) {
           console.error('[auto-close] Cron failed:', err)
         }

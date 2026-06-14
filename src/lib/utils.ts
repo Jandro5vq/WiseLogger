@@ -32,10 +32,6 @@ export function formatDuration(startTime: string, endTime?: string | null): stri
   return formatMinutes(ms / 60000)
 }
 
-export function todayISO(): string {
-  return new Date().toISOString().split('T')[0]
-}
-
 /** Convert a local datetime-local input value to ISO 8601 with local tz offset */
 export function localInputToISO(value: string): string {
   if (!value) return new Date().toISOString()
