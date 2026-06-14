@@ -7,7 +7,7 @@ import { listEntries } from '@/lib/db/queries/entries'
 import { listTasksForEntries } from '@/lib/db/queries/tasks'
 import { getBreaksForEntries } from '@/lib/db/queries/entry-breaks'
 import { breakToInterval } from '@/lib/business/breaks'
-import { netTaskMinutes } from '@/lib/business/balance'
+import { taskWorkedMinutes } from '@/lib/business/break-math'
 
 interface TaskAggRow {
   description: string
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
 
     for (const t of entryTasks) {
       if (!t.startTime || !t.endTime) continue
-      const net = netTaskMinutes(t.startTime, t.endTime, breakIntervals)
+      const net = taskWorkedMinutes(t.startTime, t.endTime, breakIntervals)
       if (net <= 0) continue
       const prev = agg.get(t.description)
       if (prev) {

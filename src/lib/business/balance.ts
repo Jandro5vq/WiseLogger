@@ -2,10 +2,7 @@ import { listEntries, getEntryById } from '@/lib/db/queries/entries'
 import { listTasksForEntry, listTasksForEntries } from '@/lib/db/queries/tasks'
 import { getEntryBreaks, getBreaksForEntries } from '@/lib/db/queries/entry-breaks'
 import { breakToInterval } from '@/lib/business/breaks'
-import { netTaskMinutes } from '@/lib/business/break-math'
-
-// Re-export so existing importers (e.g. API routes) keep working.
-export { netTaskMinutes }
+import { sumWorkedMinutes } from '@/lib/business/break-math'
 
 export interface DaySummary {
   date: string
@@ -44,9 +41,7 @@ export function computeBalance(userId: string, upToDate?: string, fromDate?: str
     const entryBreaks = breaksMap.get(entry.id) ?? []
     const breakIntervals = entryBreaks.map((b) => breakToInterval(b, entry.date))
 
-    const workedMinutes = entryTasks
-      .filter((t) => t.startTime && t.endTime)
-      .reduce((sum, t) => sum + netTaskMinutes(t.startTime, t.endTime!, breakIntervals), 0)
+    const workedMinutes = sumWorkedMinutes(entryTasks, breakIntervals)
 
     const dayBalance = workedMinutes - entry.expectedMinutes
     totalWorked += workedMinutes
@@ -79,7 +74,5 @@ export function computeEntryWorkedMinutes(entryId: string): number {
   const entryBreaks = getEntryBreaks(entryId)
   const breakIntervals = entryBreaks.map((b) => breakToInterval(b, entry.date))
 
-  return entryTasks
-    .filter((t) => t.startTime && t.endTime)
-    .reduce((sum, t) => sum + netTaskMinutes(t.startTime, t.endTime!, breakIntervals), 0)
+  return sumWorkedMinutes(entryTasks, breakIntervals)
 }

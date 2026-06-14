@@ -2,16 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import { formatMinutes } from '@/lib/utils'
-import { breakOverlapMs } from '@/lib/business/break-math'
+import { breakOverlapMs, type BreakInterval } from '@/lib/business/break-math'
 
 interface TodayStatsProps {
   entryStartTime: string           // fallback if no tasks yet
   firstTaskStartTime?: string      // drives the expectedEnd reference
-  completedTaskMinutes: number     // net sum of finished task durations (break time subtracted)
+  completedTaskMinutes: number     // net worked minutes of finished tasks (rounded per segment)
   expectedMinutes: number
   totalBreakMinutes: number        // sum of today's breaks (shifts expectedEnd)
   activeTaskStartTime?: string     // ISO — for live "worked" ticking
-  breaks?: { startIso: string; endIso: string }[] // today's breaks, to keep live time net
+  breaks?: BreakInterval[]         // today's breaks, to keep live time net
 }
 
 function fmtHHMM(ms: number): string {

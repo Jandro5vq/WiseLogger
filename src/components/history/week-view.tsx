@@ -7,9 +7,7 @@ import { formatMinutes } from '@/lib/utils'
 import type { TaskWithTags } from '@/types/db'
 import { ArrowLeftBox, ArrowRightBox } from 'pixelarticons/react'
 import { useToast } from '@/components/ui/toast'
-import { netTaskMinutes } from '@/lib/business/break-math'
-
-type BreakInterval = { startIso: string; endIso: string }
+import { taskWorkedMinutes, type BreakInterval } from '@/lib/business/break-math'
 
 import { loadBilled, saveBilled, billedKey, groupSignature, fetchBilledFromServer, markBilledOnServer, unmarkBilledOnServer, type BilledMap } from '@/lib/billed'
 
@@ -95,8 +93,8 @@ function groupTasks(tasks: TaskWithTags[], breaks: BreakInterval[]): TaskGroup[]
   const map = new Map<string, { tags: string[]; totalMinutes: number; sessions: number; notes: string | null; tasks: TaskWithTags[] }>()
   for (const t of tasks) {
     if (!t.endTime) continue
-    // Net minutes (break overlap subtracted) so per-task totals sum to the day's worked total
-    const minutes = netTaskMinutes(t.startTime, t.endTime, breaks)
+    // Net worked minutes (rounded per segment) so per-task totals sum to the day's worked total
+    const minutes = taskWorkedMinutes(t.startTime, t.endTime, breaks)
     const existing = map.get(t.description)
     if (existing) {
       existing.totalMinutes += minutes

@@ -3,10 +3,8 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { formatMinutes } from '@/lib/utils'
-import { netTaskMinutes } from '@/lib/business/break-math'
+import { taskWorkedMinutes, type BreakInterval } from '@/lib/business/break-math'
 import type { TaskWithTags } from '@/types/db'
-
-type BreakInterval = { startIso: string; endIso: string }
 
 interface DayDetailPayload {
   date: string
@@ -37,7 +35,7 @@ function fmtTime(iso: string | null): string {
 
 function taskDuration(t: TaskWithTags, breaks: BreakInterval[]): number {
   if (!t.endTime) return 0
-  return netTaskMinutes(t.startTime, t.endTime, breaks)
+  return taskWorkedMinutes(t.startTime, t.endTime, breaks)
 }
 
 export function DayDetailDrawer({ date, onClose }: DayDetailDrawerProps) {

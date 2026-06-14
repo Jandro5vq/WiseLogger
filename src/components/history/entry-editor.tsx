@@ -3,7 +3,7 @@
 import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMinutes, isoToLocalInput } from '@/lib/utils'
-import { netTaskMinutes } from '@/lib/business/break-math'
+import { sumWorkedMinutes } from '@/lib/business/break-math'
 import type { Entry, TaskWithTags } from '@/types/db'
 import { TaskList } from '@/components/dashboard/task-list'
 import { DateTimeInput } from '@/components/ui/date-time-input'
@@ -187,11 +187,9 @@ export function EntryEditor({ date, entry, tasks, breaks = [] }: EntryEditorProp
 
   const isDayOff = entry?.expectedMinutes === 0
 
-  // Net worked minutes (break overlap subtracted) so this matches the per-task
-  // totals in the list below and the balance shown in summary views.
-  const workedMinutes = tasks
-    .filter((t) => t.endTime)
-    .reduce((sum, t) => sum + netTaskMinutes(t.startTime, t.endTime!, breaks), 0)
+  // Net worked minutes (break overlap subtracted, rounded per segment) so this matches
+  // the per-task totals in the list below and the balance shown in summary views.
+  const workedMinutes = sumWorkedMinutes(tasks, breaks)
 
   const dayBalance = workedMinutes - (entry?.expectedMinutes ?? 0)
 

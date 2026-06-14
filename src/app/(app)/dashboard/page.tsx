@@ -16,7 +16,7 @@ import { listEntries, listUnclosedEntriesBefore } from '@/lib/db/queries/entries
 import { autoSplitActiveTask } from '@/lib/business/spans'
 import { breakToInterval } from '@/lib/business/breaks'
 import { autoCloseEntry } from '@/lib/business/auto-close'
-import { netTaskMinutes } from '@/lib/business/break-math'
+import { sumWorkedMinutes } from '@/lib/business/break-math'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,11 +41,9 @@ export default async function DashboardPage() {
   const breaks = getEntryBreaks(entry.id)
   const breakIntervals = breaks.map((b) => breakToInterval(b, today))
   const totalBreakMinutes = getTotalBreakMinutes(entry.id)
-  // Net task time (overlapping break time subtracted) so the dashboard matches the
-  // history/summary views, which also use netTaskMinutes.
-  const completedMinutes = tasks
-    .filter((t) => t.endTime)
-    .reduce((sum, t) => sum + netTaskMinutes(t.startTime, t.endTime!, breakIntervals), 0)
+  // Net worked time (break overlap subtracted, rounded per segment) so the dashboard
+  // matches the history/summary views — all use sumWorkedMinutes.
+  const completedMinutes = sumWorkedMinutes(tasks, breakIntervals)
   const activeTask = tasks.find((t) => !t.endTime)
   const completedTasks = tasks.filter((t) => t.endTime)
   const isClosed = !!entry.endTime

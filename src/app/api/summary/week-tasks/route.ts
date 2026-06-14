@@ -7,9 +7,8 @@ import { listEntries } from '@/lib/db/queries/entries'
 import { listTasksForEntries } from '@/lib/db/queries/tasks'
 import { getBreaksForEntries } from '@/lib/db/queries/entry-breaks'
 import { breakToInterval } from '@/lib/business/breaks'
-import { netTaskMinutes } from '@/lib/business/break-math'
+import { sumWorkedMinutes } from '@/lib/business/break-math'
 import { parseTaskTags } from '@/types/db'
-import type { Task } from '@/types/db'
 
 function localDate(d: Date): string {
   const y = d.getFullYear()
@@ -55,17 +54,11 @@ export async function GET(req: NextRequest) {
     return (breaksMap.get(entryId) ?? []).map((b) => breakToInterval(b, entryDate))
   }
 
-  function computeWorked(entryId: string, breakIntervals: ReturnType<typeof breakIntervalsFor>): number {
-    return (tasksMap.get(entryId) ?? [])
-      .filter((t: Task) => t.startTime && t.endTime)
-      .reduce((sum: number, t: Task) => sum + netTaskMinutes(t.startTime, t.endTime!, breakIntervals), 0)
-  }
-
   const days = weekDates.map((dayDate) => {
     const entry = entryByDate.get(dayDate)
     const breaks = entry ? breakIntervalsFor(entry.id, entry.date) : []
     const tasks = entry ? (tasksMap.get(entry.id) ?? []).map(parseTaskTags) : []
-    const workedMinutes = entry ? computeWorked(entry.id, breaks) : 0
+    const workedMinutes = entry ? sumWorkedMinutes(tasksMap.get(entry.id) ?? [], breaks) : 0
     const expectedMinutes = entry?.expectedMinutes ?? 0
     return {
       date: dayDate,

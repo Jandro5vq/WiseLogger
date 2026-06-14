@@ -7,10 +7,8 @@ import type { TaskWithTags } from '@/types/db'
 import { DateTimeInput } from '@/components/ui/date-time-input'
 import { Play, PenSquare, PlusBox, Note } from 'pixelarticons/react'
 import { useToast } from '@/components/ui/toast'
-import { netTaskMinutes } from '@/lib/business/break-math'
+import { taskWorkedMinutes, sumWorkedMinutes, type BreakInterval } from '@/lib/business/break-math'
 import { loadBilled, saveBilled, billedKey, groupSignature, fetchBilledFromServer, markBilledOnServer, unmarkBilledOnServer, type BilledMap } from '@/lib/billed'
-
-type BreakInterval = { startIso: string; endIso: string }
 
 function TrashIcon({ size = 16 }: { size?: number }) {
   return (
@@ -225,14 +223,6 @@ function fmtTime(iso: string) {
   return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
 }
 
-/** Sum of net minutes (break overlap subtracted) for the given completed tasks. */
-function totalNetMinutes(tasks: TaskWithTags[], breaks: BreakInterval[]): number {
-  return tasks.reduce((sum, t) => {
-    if (!t.endTime) return sum
-    return sum + netTaskMinutes(t.startTime, t.endTime, breaks)
-  }, 0)
-}
-
 // ─── grouped row ─────────────────────────────────────────────────────────────
 
 function TaskGroup({
@@ -265,7 +255,7 @@ function TaskGroup({
   const [addingSpan, setAddingSpan] = useState(false)
 
   const allTags = Array.from(new Set(segments.flatMap((t) => t.tags)))
-  const totalMinutes = totalNetMinutes(segments, breaks)
+  const totalMinutes = sumWorkedMinutes(segments, breaks)
   const spans = segments.length
   const isActive = segments.some((s) => s.id === activeTaskId)
 
@@ -477,7 +467,7 @@ function TaskGroup({
                     {fmtTime(seg.startTime)} → {seg.endTime ? fmtTime(seg.endTime) : '…'}
                     <span className="ml-2 text-foreground/70">
                       {seg.endTime
-                        ? formatMinutes(netTaskMinutes(seg.startTime, seg.endTime, breaks))
+                        ? formatMinutes(taskWorkedMinutes(seg.startTime, seg.endTime, breaks))
                         : seg.id === activeTaskId
                           ? <span className="text-green-500">en curso</span>
                           : '—'}
