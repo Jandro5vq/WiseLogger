@@ -4,22 +4,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { computeBalance } from '@/lib/business/balance'
-
-function localDate(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
-function getWeekBounds(dateStr: string): { from: string; to: string } {
-  const d = new Date(dateStr + 'T00:00:00')
-  const monday = new Date(d)
-  monday.setDate(d.getDate() - ((d.getDay() + 6) % 7))
-  const sunday = new Date(monday)
-  sunday.setDate(monday.getDate() + 6)
-  return { from: localDate(monday), to: localDate(sunday) }
-}
+import { getWeekBounds } from '@/lib/tz'
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req)

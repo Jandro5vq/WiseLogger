@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { MonthCalendar } from '@/components/history/month-calendar'
 import { WeekView } from '@/components/history/week-view'
+import { getJson } from '@/lib/fetcher'
 import type { DaySummary } from '@/lib/business/balance'
 
 type View = 'week' | 'month'
@@ -16,8 +17,7 @@ export default function HistoryPage() {
 
   useEffect(() => {
     if (view !== 'month') return
-    fetch(`/api/summary/month?year=${year}&month=${month}`)
-      .then((r) => r.json())
+    getJson<{ days?: DaySummary[] }>(`/api/summary/month?year=${year}&month=${month}`)
       .then((data) => setDays(data.days ?? []))
       .catch(() => {})
   }, [year, month, view])

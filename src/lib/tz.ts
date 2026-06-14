@@ -63,6 +63,17 @@ export function localMidnightUtcMs(dateStr: string, timeZone = 'UTC'): number {
   return new Date(hhmmToUTC(dateStr, '00:00', timeZone)).getTime()
 }
 
+/** Monday–Sunday ISO week bounds (inclusive) containing `dateStr`. Pure UTC math. */
+export function getWeekBounds(dateStr: string): { from: string; to: string } {
+  const d = new Date(`${dateStr}T00:00:00Z`)
+  const dow = d.getUTCDay() // 0=Sun … 6=Sat
+  const monday = new Date(d)
+  monday.setUTCDate(d.getUTCDate() - ((dow + 6) % 7))
+  const sunday = new Date(monday)
+  sunday.setUTCDate(monday.getUTCDate() + 6)
+  return { from: monday.toISOString().slice(0, 10), to: sunday.toISOString().slice(0, 10) }
+}
+
 /** A piece of a task that falls within a single local calendar day. */
 export interface DaySegment {
   dateStr: string // local YYYY-MM-DD the segment belongs to

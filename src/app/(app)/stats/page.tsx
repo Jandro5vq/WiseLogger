@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useToast } from '@/components/ui/toast'
-import { formatMinutes } from '@/lib/utils'
+import { formatMinutes, localDateString } from '@/lib/utils'
+import { getJson } from '@/lib/fetcher'
 import { HoursBarChart } from '@/components/stats/hours-bar-chart'
 import { BalanceLineChart } from '@/components/stats/balance-line-chart'
 import { ActivityHeatmap } from '@/components/stats/activity-heatmap'
@@ -14,35 +15,35 @@ import type { DaySummary } from '@/lib/business/balance'
 type Period = 'week' | 'month' | 'year'
 type HeatmapPeriod = '3m' | '6m' | '1a'
 
-const HEATMAP_WEEKS: Record<HeatmapPeriod, number> = { '3m': 13, '6m': 26, '1a': 52 }
-
-function localDateStr(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
+interface SummaryData {
+  days: DaySummary[]
+  totalWorkedMinutes: number
+  totalExpectedMinutes: number
+  cumulativeBalance: number
 }
+
+const HEATMAP_WEEKS: Record<HeatmapPeriod, number> = { '3m': 13, '6m': 26, '1a': 52 }
 
 function periodBounds(period: Period): { from: string; to: string } {
   const today = new Date()
-  const to = localDateStr(today)
+  const to = localDateString(today)
   if (period === 'week') {
     const from = new Date(today)
     from.setDate(today.getDate() - 6)
-    return { from: localDateStr(from), to }
+    return { from: localDateString(from), to }
   }
   if (period === 'month') {
     const from = new Date(today.getFullYear(), today.getMonth(), 1)
-    return { from: localDateStr(from), to }
+    return { from: localDateString(from), to }
   }
   const from = new Date(today.getFullYear(), 0, 1)
-  return { from: localDateStr(from), to }
+  return { from: localDateString(from), to }
 }
 
 function heatmapFromDate(weeks: number): string {
   const d = new Date()
   d.setDate(d.getDate() - (weeks * 7 - 1))
-  return localDateStr(d)
+  return localDateString(d)
 }
 
 function Skeleton({ height = 96 }: { height?: number }) {
@@ -53,12 +54,7 @@ export default function StatsPage() {
   const toast = useToast()
   const [period, setPeriod] = useState<Period>('month')
   const [heatmapPeriod, setHeatmapPeriod] = useState<HeatmapPeriod>('1a')
-  const [data, setData] = useState<{
-    days: DaySummary[]
-    totalWorkedMinutes: number
-    totalExpectedMinutes: number
-    cumulativeBalance: number
-  } | null>(null)
+  const [data, setData] = useState<SummaryData | null>(null)
   const [loadingData, setLoadingData] = useState(true)
   const [heatmapDays, setHeatmapDays] = useState<DaySummary[]>([])
   const [loadingHeatmap, setLoadingHeatmap] = useState(true)
@@ -79,13 +75,11 @@ export default function StatsPage() {
           ? (() => { const d = new Date(); return `/api/summary/month?year=${d.getFullYear()}&month=${d.getMonth() + 1}` })()
           : `/api/summary/range?from=${from}&to=${to}`
 
-    fetch(summaryUrl)
-      .then((r) => r.json())
+    getJson<SummaryData>(summaryUrl)
       .then((d) => { setData(d); setLoadingData(false) })
       .catch(() => { setLoadingData(false); toast.error('Error al cargar estadísticas') })
 
-    fetch(`/api/summary/tasks-agg?from=${from}&to=${to}`)
-      .then((r) => r.json())
+    getJson<{ tasks?: TopTask[] }>(`/api/summary/tasks-agg?from=${from}&to=${to}`)
       .then((d) => { setTopTasks(d.tasks ?? []); setLoadingTopTasks(false) })
       .catch(() => { setLoadingTopTasks(false); toast.error('Error al cargar tareas') })
   }, [period, toast])
@@ -94,8 +88,7 @@ export default function StatsPage() {
   useEffect(() => {
     setLoadingHeatmap(true)
     const from = heatmapFromDate(HEATMAP_WEEKS[heatmapPeriod])
-    fetch(`/api/summary/balance?from=${from}`)
-      .then((r) => r.json())
+    getJson<{ days?: DaySummary[] }>(`/api/summary/balance?from=${from}`)
       .then((d) => { setHeatmapDays(d.days ?? []); setLoadingHeatmap(false) })
       .catch(() => { setLoadingHeatmap(false); toast.error('Error al cargar el balance') })
   }, [heatmapPeriod, toast])

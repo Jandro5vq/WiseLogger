@@ -3,21 +3,14 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { formatMinutes } from '@/lib/utils'
+import { formatMinutes, localDateString } from '@/lib/utils'
 import type { TaskWithTags } from '@/types/db'
 import { ArrowLeftBox, ArrowRightBox } from 'pixelarticons/react'
 import { useToast } from '@/components/ui/toast'
 import { taskWorkedMinutes, type BreakInterval } from '@/lib/business/break-math'
+import { getJson } from '@/lib/fetcher'
 
 import { loadBilled, saveBilled, billedKey, groupSignature, fetchBilledFromServer, markBilledOnServer, unmarkBilledOnServer, type BilledMap } from '@/lib/billed'
-
-// Use local date to avoid UTC offset shifting the day
-function localDate(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
 
 function CopyButton({ text, title = 'Copiar' }: { text: string; title?: string }) {
   const [copied, setCopied] = useState(false)
@@ -76,7 +69,7 @@ function fmtDate(dateStr: string): string {
 }
 
 function isToday(dateStr: string): boolean {
-  return dateStr === localDate(new Date())
+  return dateStr === localDateString()
 }
 
 // Group tasks by description, compute total per group
@@ -211,7 +204,7 @@ function DayCard({ day, index, billed, onToggleBilled }: {
 function addWeeks(dateStr: string, n: number): string {
   const d = new Date(dateStr + 'T00:00:00')
   d.setDate(d.getDate() + n * 7)
-  return localDate(d)
+  return localDateString(d)
 }
 
 const WEEKEND_KEY = 'wl:showWeekends'
@@ -220,7 +213,7 @@ export function WeekView() {
   const toast = useToast()
   const router = useRouter()
   const searchParams = useSearchParams()
-  const [anchorDate, setAnchorDate] = useState(() => searchParams.get('week') ?? localDate(new Date()))
+  const [anchorDate, setAnchorDate] = useState(() => searchParams.get('week') ?? localDateString())
   const [data, setData] = useState<WeekData | null>(null)
   const [loading, setLoading] = useState(true)
   const [showWeekends, setShowWeekends] = useState(false)
@@ -278,9 +271,8 @@ export function WeekView() {
 
   useEffect(() => {
     setLoading(true)
-    fetch(`/api/summary/week-tasks?date=${anchorDate}`)
-      .then((r) => r.json())
-      .then((d: WeekData) => {
+    getJson<WeekData>(`/api/summary/week-tasks?date=${anchorDate}`)
+      .then((d) => {
         setData(d)
         setLoading(false)
 
@@ -330,8 +322,8 @@ export function WeekView() {
   }
 
   const isCurrentWeek = data
-    ? localDate(new Date()) >= data.from &&
-      localDate(new Date()) <= data.to
+    ? localDateString() >= data.from &&
+      localDateString() <= data.to
     : false
 
   // Filter days: Mon-Fri (index 0-4) unless showWeekends

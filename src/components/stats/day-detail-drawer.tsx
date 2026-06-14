@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { formatMinutes } from '@/lib/utils'
+import { getJson } from '@/lib/fetcher'
 import { taskWorkedMinutes, type BreakInterval } from '@/lib/business/break-math'
 import type { TaskWithTags } from '@/types/db'
 
@@ -46,8 +47,7 @@ export function DayDetailDrawer({ date, onClose }: DayDetailDrawerProps) {
   useEffect(() => {
     if (!date) { setData(null); return }
     setLoading(true)
-    fetch(`/api/summary/day/${date}`)
-      .then((r) => r.json())
+    getJson<DayDetailPayload>(`/api/summary/day/${date}`)
       .then((d) => { setData(d); setLoading(false) })
       .catch(() => setLoading(false))
   }, [date])

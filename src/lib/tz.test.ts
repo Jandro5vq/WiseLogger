@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { hhmmToUTC, dateStringInTz, addDateStr, localMidnightUtcMs, splitAtMidnights } from './tz'
+import { hhmmToUTC, dateStringInTz, addDateStr, localMidnightUtcMs, splitAtMidnights, getWeekBounds } from './tz'
 
 // Use DST-free zones so the expected offsets are stable year-round:
 //   America/Bogota = UTC-5, Asia/Kolkata = UTC+5:30
@@ -50,6 +50,22 @@ describe('localMidnightUtcMs', () => {
       Date.parse('2026-06-14T05:00:00Z')
     )
     expect(localMidnightUtcMs('2026-06-14', 'UTC')).toBe(Date.parse('2026-06-14T00:00:00Z'))
+  })
+})
+
+describe('getWeekBounds', () => {
+  it('returns Monday–Sunday for a midweek date', () => {
+    // 2026-06-17 is a Wednesday
+    expect(getWeekBounds('2026-06-17')).toEqual({ from: '2026-06-15', to: '2026-06-21' })
+  })
+
+  it('keeps Sunday in the week that started the previous Monday', () => {
+    // 2026-06-21 is a Sunday
+    expect(getWeekBounds('2026-06-21')).toEqual({ from: '2026-06-15', to: '2026-06-21' })
+  })
+
+  it('treats Monday as the first day', () => {
+    expect(getWeekBounds('2026-06-15')).toEqual({ from: '2026-06-15', to: '2026-06-21' })
   })
 })
 

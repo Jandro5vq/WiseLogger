@@ -32,6 +32,14 @@ export function formatDuration(startTime: string, endTime?: string | null): stri
   return formatMinutes(ms / 60000)
 }
 
+/** YYYY-MM-DD for a date in the host's local timezone (defaults to now). */
+export function localDateString(d: Date = new Date()): string {
+  const y = d.getFullYear()
+  const m = String(d.getMonth() + 1).padStart(2, '0')
+  const day = String(d.getDate()).padStart(2, '0')
+  return `${y}-${m}-${day}`
+}
+
 /** Convert a local datetime-local input value to ISO 8601 with local tz offset */
 export function localInputToISO(value: string): string {
   if (!value) return new Date().toISOString()

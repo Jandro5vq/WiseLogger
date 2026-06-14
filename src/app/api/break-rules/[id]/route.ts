@@ -4,6 +4,8 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { getBreakRuleById, updateBreakRule, deleteBreakRule } from '@/lib/db/queries/break-rules'
+import { parseBody } from '@/lib/api'
+import { BreakRulePatchSchema } from '@/lib/validation'
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession(req)
@@ -14,8 +16,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
-  const body = await req.json()
-  const updated = updateBreakRule(params.id, body)
+  const parsed = parseBody(BreakRulePatchSchema, await req.json())
+  if (!parsed.ok) return parsed.response
+  if (Object.keys(parsed.data).length === 0) {
+    return NextResponse.json({ error: 'No hay campos válidos que actualizar' }, { status: 400 })
+  }
+
+  const updated = updateBreakRule(params.id, parsed.data)
   return NextResponse.json(updated)
 }
 

@@ -8,29 +8,8 @@ import { listTasksForEntries } from '@/lib/db/queries/tasks'
 import { getBreaksForEntries } from '@/lib/db/queries/entry-breaks'
 import { breakToInterval } from '@/lib/business/breaks'
 import { sumWorkedMinutes } from '@/lib/business/break-math'
+import { getWeekBounds, addDateStr } from '@/lib/tz'
 import { parseTaskTags } from '@/types/db'
-
-function localDate(d: Date): string {
-  const y = d.getFullYear()
-  const m = String(d.getMonth() + 1).padStart(2, '0')
-  const day = String(d.getDate()).padStart(2, '0')
-  return `${y}-${m}-${day}`
-}
-
-function getWeekBounds(dateStr: string): { from: string; to: string } {
-  const d = new Date(dateStr + 'T00:00:00')
-  const monday = new Date(d)
-  monday.setDate(d.getDate() - ((d.getDay() + 6) % 7))
-  const sunday = new Date(monday)
-  sunday.setDate(monday.getDate() + 6)
-  return { from: localDate(monday), to: localDate(sunday) }
-}
-
-function addDays(dateStr: string, n: number): string {
-  const d = new Date(dateStr + 'T00:00:00')
-  d.setDate(d.getDate() + n)
-  return localDate(d)
-}
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req)
@@ -41,7 +20,7 @@ export async function GET(req: NextRequest) {
 
   // Build date range for the week
   const weekDates: string[] = []
-  for (let i = 0; i < 7; i++) weekDates.push(addDays(from, i))
+  for (let i = 0; i < 7; i++) weekDates.push(addDateStr(from, i))
 
   // Batch-fetch entries, tasks, and breaks (3 queries instead of 21+)
   const weekEntries = listEntries(session.user.id, from, to)

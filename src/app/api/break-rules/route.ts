@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuidv4 } from 'uuid'
 import { getSession } from '@/lib/auth/session'
 import { getBreakRules, createBreakRule } from '@/lib/db/queries/break-rules'
+import { parseBody } from '@/lib/api'
+import { BreakRuleCreateSchema } from '@/lib/validation'
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req)
@@ -16,12 +18,9 @@ export async function POST(req: NextRequest) {
   const session = await getSession(req)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json()
-  const { ruleType, scheduleDuration, weekday, breakStart, durationMinutes, label } = body
-
-  if (!ruleType || !breakStart || durationMinutes == null) {
-    return NextResponse.json({ error: 'ruleType, breakStart and durationMinutes are required' }, { status: 400 })
-  }
+  const parsed = parseBody(BreakRuleCreateSchema, await req.json())
+  if (!parsed.ok) return parsed.response
+  const { ruleType, scheduleDuration, weekday, breakStart, durationMinutes, label } = parsed.data
 
   const rule = createBreakRule({
     id: uuidv4(),

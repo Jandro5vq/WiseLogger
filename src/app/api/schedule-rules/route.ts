@@ -5,6 +5,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuidv4 } from 'uuid'
 import { getSession } from '@/lib/auth/session'
 import { getScheduleRules, createRule } from '@/lib/db/queries/schedule-rules'
+import { parseBody } from '@/lib/api'
+import { ScheduleRuleCreateSchema } from '@/lib/validation'
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req)
@@ -16,12 +18,9 @@ export async function POST(req: NextRequest) {
   const session = await getSession(req)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const body = await req.json()
-  const { ruleType, weekday, month, specificDate, durationMinutes, label } = body
-
-  if (!ruleType || durationMinutes === undefined) {
-    return NextResponse.json({ error: 'ruleType and durationMinutes are required' }, { status: 400 })
-  }
+  const parsed = parseBody(ScheduleRuleCreateSchema, await req.json())
+  if (!parsed.ok) return parsed.response
+  const { ruleType, weekday, month, specificDate, durationMinutes, label } = parsed.data
 
   const rule = createRule({
     id: uuidv4(),
