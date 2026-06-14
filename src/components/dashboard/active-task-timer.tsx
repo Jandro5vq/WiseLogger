@@ -195,7 +195,7 @@ export function ActiveTaskTimer({ task, loadedDate, entryId, breaks, timezone }:
             <button
               onClick={() => { setEditing((v) => !v); setError('') }}
               className="text-muted-foreground hover:text-foreground transition-colors p-0.5"
-              title="Editar tarea activa"
+              aria-label="Editar tarea activa" title="Editar tarea activa"
             >
               <PenSquare width={16} height={16} />
             </button>

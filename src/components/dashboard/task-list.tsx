@@ -325,7 +325,7 @@ function TaskGroup({
               checked={!!isBilled}
               onChange={(e) => { e.stopPropagation(); onToggleBilled() }}
               onClick={(e) => e.stopPropagation()}
-              title="Marcar como imputada"
+              aria-label="Marcar como imputada" title="Marcar como imputada"
               className="h-3 w-3 rounded border-muted-foreground/40 accent-primary shrink-0 cursor-pointer"
             />
           )}
@@ -355,7 +355,7 @@ function TaskGroup({
             <button
               onClick={resume}
               className="text-muted-foreground hover:text-primary transition-colors p-0.5"
-              title="Reanudar tarea"
+              aria-label="Reanudar tarea" title="Reanudar tarea"
             >
               <Play width={16} height={16} />
             </button>
@@ -363,7 +363,7 @@ function TaskGroup({
           <button
             onClick={(e) => { e.stopPropagation(); setAddingSpan((v) => !v) }}
             className="text-muted-foreground hover:text-foreground transition-colors p-0.5"
-            title="Añadir sesión"
+            aria-label="Añadir sesión" title="Añadir sesión"
           >
             <PlusBox width={16} height={16} />
           </button>
@@ -371,7 +371,7 @@ function TaskGroup({
             <button
               onClick={(e) => { e.stopPropagation(); setNotesValue(''); setEditingNotes(true) }}
               className="text-muted-foreground hover:text-foreground transition-colors p-0.5"
-              title="Añadir notas"
+              aria-label="Añadir notas" title="Añadir notas"
             >
               <Note width={16} height={16} />
             </button>
@@ -380,7 +380,7 @@ function TaskGroup({
             <button
               onClick={(e) => { e.stopPropagation(); setEditingId(segments[0].id) }}
               className="text-muted-foreground hover:text-foreground transition-colors p-0.5"
-              title="Editar"
+              aria-label="Editar" title="Editar"
             >
               <PenSquare width={16} height={16} />
             </button>
@@ -388,7 +388,7 @@ function TaskGroup({
           <button
             onClick={(e) => { e.stopPropagation(); deleteAll() }}
             className="text-muted-foreground hover:text-destructive transition-colors p-0.5"
-            title="Eliminar"
+            aria-label="Eliminar" title="Eliminar"
           >
             <TrashIcon size={16} />
           </button>

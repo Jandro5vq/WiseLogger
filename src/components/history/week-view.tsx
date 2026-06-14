@@ -176,7 +176,7 @@ function DayCard({ day, index, billed, onToggleBilled }: {
                     type="checkbox"
                     checked={isBilled}
                     onChange={() => onToggleBilled(day.date, g.description, g.signature)}
-                    title="Marcar como imputada"
+                    aria-label="Marcar como imputada" title="Marcar como imputada"
                     className="h-3 w-3 rounded border-muted-foreground/40 accent-primary shrink-0 cursor-pointer"
                   />
                   <span className={`text-xs font-medium truncate ${isBilled ? 'line-through' : ''}`} title={g.description}>{g.description}</span>
