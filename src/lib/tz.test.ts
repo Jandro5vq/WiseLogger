@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { hhmmToUTC, dateStringInTz, addDateStr, localMidnightUtcMs } from './tz'
+import { hhmmToUTC, dateStringInTz, addDateStr, localMidnightUtcMs, splitAtMidnights } from './tz'
 
 // Use DST-free zones so the expected offsets are stable year-round:
 //   America/Bogota = UTC-5, Asia/Kolkata = UTC+5:30
@@ -50,5 +50,43 @@ describe('localMidnightUtcMs', () => {
       Date.parse('2026-06-14T05:00:00Z')
     )
     expect(localMidnightUtcMs('2026-06-14', 'UTC')).toBe(Date.parse('2026-06-14T00:00:00Z'))
+  })
+})
+
+describe('splitAtMidnights', () => {
+  it('returns a single segment for a task within one day', () => {
+    const segs = splitAtMidnights('2026-06-14T09:00:00Z', '2026-06-14T10:00:00Z', 'UTC')
+    expect(segs).toHaveLength(1)
+    expect(segs[0]).toEqual({
+      dateStr: '2026-06-14',
+      startIso: '2026-06-14T09:00:00.000Z',
+      endIso: '2026-06-14T10:00:00.000Z',
+    })
+  })
+
+  it('splits a task crossing UTC midnight into two day segments', () => {
+    const segs = splitAtMidnights('2026-06-14T23:00:00Z', '2026-06-15T01:00:00Z', 'UTC')
+    expect(segs).toEqual([
+      { dateStr: '2026-06-14', startIso: '2026-06-14T23:00:00.000Z', endIso: '2026-06-15T00:00:00.000Z' },
+      { dateStr: '2026-06-15', startIso: '2026-06-15T00:00:00.000Z', endIso: '2026-06-15T01:00:00.000Z' },
+    ])
+  })
+
+  it('splits at local midnight for a negative-offset zone (Bogota)', () => {
+    // 22:00 → 02:00 Bogota local == 03:00Z → 07:00Z, midnight Bogota = 05:00Z
+    const segs = splitAtMidnights('2026-06-15T03:00:00Z', '2026-06-15T07:00:00Z', 'America/Bogota')
+    expect(segs).toEqual([
+      { dateStr: '2026-06-14', startIso: '2026-06-15T03:00:00.000Z', endIso: '2026-06-15T05:00:00.000Z' },
+      { dateStr: '2026-06-15', startIso: '2026-06-15T05:00:00.000Z', endIso: '2026-06-15T07:00:00.000Z' },
+    ])
+  })
+
+  it('splits a multi-day task into one segment per day', () => {
+    const segs = splitAtMidnights('2026-06-14T22:00:00Z', '2026-06-16T03:00:00Z', 'UTC')
+    expect(segs.map((s) => s.dateStr)).toEqual(['2026-06-14', '2026-06-15', '2026-06-16'])
+  })
+
+  it('returns [] when end is not after start', () => {
+    expect(splitAtMidnights('2026-06-14T10:00:00Z', '2026-06-14T10:00:00Z', 'UTC')).toEqual([])
   })
 })

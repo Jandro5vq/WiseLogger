@@ -62,3 +62,37 @@ export function addDateStr(dateStr: string, n: number): string {
 export function localMidnightUtcMs(dateStr: string, timeZone = 'UTC'): number {
   return new Date(hhmmToUTC(dateStr, '00:00', timeZone)).getTime()
 }
+
+/** A piece of a task that falls within a single local calendar day. */
+export interface DaySegment {
+  dateStr: string // local YYYY-MM-DD the segment belongs to
+  startIso: string
+  endIso: string
+}
+
+/**
+ * Split [startIso, endIso) at every local midnight in the given timezone, so each
+ * returned segment belongs to exactly one local calendar day. A task that does not
+ * cross midnight yields a single segment. Returns [] if end <= start.
+ */
+export function splitAtMidnights(startIso: string, endIso: string, timeZone = 'UTC'): DaySegment[] {
+  const startMs = Date.parse(startIso)
+  const endMs = Date.parse(endIso)
+  if (!(endMs > startMs)) return []
+
+  const segments: DaySegment[] = []
+  let curMs = startMs
+  // Hard cap guards against any pathological timezone arithmetic (≈ a year of days).
+  for (let i = 0; curMs < endMs && i < 400; i++) {
+    const dateStr = dateStringInTz(new Date(curMs), timeZone)
+    const nextMidnight = localMidnightUtcMs(addDateStr(dateStr, 1), timeZone)
+    const segEndMs = Math.min(nextMidnight, endMs)
+    segments.push({
+      dateStr,
+      startIso: new Date(curMs).toISOString(),
+      endIso: new Date(segEndMs).toISOString(),
+    })
+    curMs = segEndMs
+  }
+  return segments
+}

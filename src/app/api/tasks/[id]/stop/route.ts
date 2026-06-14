@@ -7,6 +7,8 @@ import { getTaskById, listTasksForEntry, updateTask } from '@/lib/db/queries/tas
 import { getEntryBreaks } from '@/lib/db/queries/entry-breaks'
 import { getEntryById } from '@/lib/db/queries/entries'
 import { breakToInterval } from '@/lib/business/breaks'
+import { splitTaskAcrossMidnights } from '@/lib/business/spans'
+import { sqlite } from '@/lib/db'
 import { parseTaskTags } from '@/types/db'
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
@@ -60,6 +62,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     endTime = new Date(Math.min(...obstacles)).toISOString()
   }
 
-  const updated = updateTask(params.id, { endTime })
-  return NextResponse.json(parseTaskTags(updated!))
+  // Stop the task, then split it across local midnights so each calendar day keeps
+  // its own segment (no-op unless the task spans midnight in the user's timezone).
+  sqlite.transaction(() => {
+    updateTask(params.id, { endTime })
+    splitTaskAcrossMidnights(params.id, session.user.id, session.user.timezone)
+  })()
+
+  const result = getTaskById(params.id)
+  return NextResponse.json(parseTaskTags(result!))
 }

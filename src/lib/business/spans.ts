@@ -1,7 +1,9 @@
 import { v4 as uuidv4 } from 'uuid'
-import { listTasksForEntry, updateTask, deleteTask, createTask } from '@/lib/db/queries/tasks'
+import { listTasksForEntry, updateTask, deleteTask, createTask, getTaskById } from '@/lib/db/queries/tasks'
 import { getEntryBreaks } from '@/lib/db/queries/entry-breaks'
 import { breakToInterval, type Interval } from '@/lib/business/breaks'
+import { autoCreateEntry } from '@/lib/business/tasks'
+import { splitAtMidnights } from '@/lib/tz'
 
 /**
  * Splits/trims/deletes tasks that overlap with a newly added break interval.
@@ -275,6 +277,46 @@ export function adjustAdjacentTasksForEdit(
   }
 
   return { affectedIds, deletedDescriptions }
+}
+
+/**
+ * If a completed task crosses one or more local midnights (in the user's timezone),
+ * splits it so each calendar day gets its own task in its own day-entry:
+ *   – the original task is trimmed to end at the first local midnight
+ *   – each later day-segment becomes a new task in that day's entry (auto-created,
+ *     which also seeds that day's break rules), then carved around that day's breaks
+ * No-op for tasks that stay within a single local day. Idempotent.
+ */
+export function splitTaskAcrossMidnights(taskId: string, userId: string, timezone: string): void {
+  const task = getTaskById(taskId)
+  if (!task || !task.endTime) return
+
+  const segments = splitAtMidnights(task.startTime, task.endTime, timezone)
+  if (segments.length <= 1) return
+
+  // First segment stays on the original task (its entry is the start day).
+  updateTask(task.id, { endTime: segments[0].endIso })
+
+  // Remaining segments move to their own day-entries.
+  for (const seg of segments.slice(1)) {
+    const entry = autoCreateEntry(userId, seg.dateStr)
+    createTask({
+      id: uuidv4(),
+      entryId: entry.id,
+      userId,
+      startTime: seg.startIso,
+      endTime: seg.endIso,
+      description: task.description,
+      tags: task.tags,
+      notes: task.notes ?? undefined,
+    })
+    // Carve the new span around that day's breaks, then fuse touching spans.
+    for (const b of getEntryBreaks(entry.id)) {
+      const { startIso, endIso } = breakToInterval(b, entry.date)
+      splitTasksAroundBreak(entry.id, userId, startIso, endIso)
+    }
+    mergeContiguousSpans(entry.id)
+  }
 }
 
 /**
