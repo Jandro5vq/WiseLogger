@@ -34,8 +34,8 @@ export function NewTaskForm({ entryId, activeTaskId, defaultStartTime }: NewTask
 
   useEffect(() => {
     fetch('/api/tasks/favorites')
-      .then((r) => r.json())
-      .then(setFavorites)
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setFavorites(Array.isArray(d) ? d : []))
       .catch(() => {})
   }, [])
 

@@ -16,6 +16,7 @@ import { listEntries, listUnclosedEntriesBefore } from '@/lib/db/queries/entries
 import { autoSplitActiveTask } from '@/lib/business/spans'
 import { breakToInterval } from '@/lib/business/breaks'
 import { autoCloseEntry } from '@/lib/business/auto-close'
+import { netTaskMinutes } from '@/lib/business/break-math'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,14 +38,14 @@ export default async function DashboardPage() {
 
   const rawTasks = listTasksForEntry(entry.id)
   const tasks = rawTasks.map(parseTaskTags)
-  // Raw task durations (no break subtraction) for the "Tiempo en tareas" display.
-  // Matches how the active-task live ticker works (now − startTime, no break deduction).
-  const rawCompletedMinutes = tasks
-    .filter((t) => t.endTime)
-    .reduce((sum, t) => sum + (new Date(t.endTime!).getTime() - new Date(t.startTime).getTime()) / 60_000, 0)
   const breaks = getEntryBreaks(entry.id)
   const breakIntervals = breaks.map((b) => breakToInterval(b, today))
   const totalBreakMinutes = getTotalBreakMinutes(entry.id)
+  // Net task time (overlapping break time subtracted) so the dashboard matches the
+  // history/summary views, which also use netTaskMinutes.
+  const completedMinutes = tasks
+    .filter((t) => t.endTime)
+    .reduce((sum, t) => sum + netTaskMinutes(t.startTime, t.endTime!, breakIntervals), 0)
   const activeTask = tasks.find((t) => !t.endTime)
   const completedTasks = tasks.filter((t) => t.endTime)
   const isClosed = !!entry.endTime
@@ -89,14 +90,16 @@ export default async function DashboardPage() {
       <TodayStats
         entryStartTime={entryStartTime}
         firstTaskStartTime={firstTaskStartTime}
-        completedTaskMinutes={rawCompletedMinutes}
+        completedTaskMinutes={completedMinutes}
         expectedMinutes={entry.expectedMinutes}
         totalBreakMinutes={totalBreakMinutes}
         activeTaskStartTime={activeTask?.startTime}
+        breaks={breakIntervals}
       />
 
       {activeTask && (
         <ActiveTaskTimer
+          key={activeTask.id}
           task={activeTask}
           loadedDate={today}
           entryId={entry.id}
@@ -121,6 +124,7 @@ export default async function DashboardPage() {
             activeTaskId={activeTask?.id}
             showBilledCheckbox
             entryDate={today}
+            breaks={breakIntervals}
           />
           {!isClosed && (
             <NewTaskForm

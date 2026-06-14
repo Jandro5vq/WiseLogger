@@ -75,18 +75,28 @@ export async function fetchBilledFromServer(): Promise<BilledMap> {
   }
 }
 
-export async function markBilledOnServer(date: string, description: string, signature: string): Promise<void> {
-  await fetch('/api/billed', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ date, description, signature }),
-  })
+export async function markBilledOnServer(date: string, description: string, signature: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/billed', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, description, signature }),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
 }
 
-export async function unmarkBilledOnServer(date: string, description: string): Promise<void> {
-  await fetch('/api/billed', {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ date, description }),
-  })
+export async function unmarkBilledOnServer(date: string, description: string): Promise<boolean> {
+  try {
+    const res = await fetch('/api/billed', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date, description }),
+    })
+    return res.ok
+  } catch {
+    return false
+  }
 }

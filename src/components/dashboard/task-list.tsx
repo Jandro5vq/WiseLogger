@@ -1,13 +1,16 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useEffect, useTransition } from 'react'
+import { useState, useEffect, useRef, useTransition } from 'react'
 import { formatMinutes, isoToLocalInput } from '@/lib/utils'
 import type { TaskWithTags } from '@/types/db'
 import { DateTimeInput } from '@/components/ui/date-time-input'
 import { Play, PenSquare, PlusBox, Note } from 'pixelarticons/react'
 import { useToast } from '@/components/ui/toast'
+import { netTaskMinutes } from '@/lib/business/break-math'
 import { loadBilled, saveBilled, billedKey, groupSignature, fetchBilledFromServer, markBilledOnServer, unmarkBilledOnServer, type BilledMap } from '@/lib/billed'
+
+type BreakInterval = { startIso: string; endIso: string }
 
 function TrashIcon({ size = 16 }: { size?: number }) {
   return (
@@ -222,10 +225,11 @@ function fmtTime(iso: string) {
   return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
 }
 
-function totalMs(tasks: TaskWithTags[]): number {
+/** Sum of net minutes (break overlap subtracted) for the given completed tasks. */
+function totalNetMinutes(tasks: TaskWithTags[], breaks: BreakInterval[]): number {
   return tasks.reduce((sum, t) => {
     if (!t.endTime) return sum
-    return sum + new Date(t.endTime).getTime() - new Date(t.startTime).getTime()
+    return sum + netTaskMinutes(t.startTime, t.endTime, breaks)
   }, 0)
 }
 
@@ -239,6 +243,7 @@ function TaskGroup({
   allowResume = true,
   isBilled,
   onToggleBilled,
+  breaks,
 }: {
   description: string
   segments: TaskWithTags[]
@@ -247,6 +252,7 @@ function TaskGroup({
   allowResume?: boolean
   isBilled?: boolean
   onToggleBilled?: () => void
+  breaks: BreakInterval[]
 }) {
   const router = useRouter()
   const [, startTransition] = useTransition()
@@ -259,7 +265,7 @@ function TaskGroup({
   const [addingSpan, setAddingSpan] = useState(false)
 
   const allTags = Array.from(new Set(segments.flatMap((t) => t.tags)))
-  const total = totalMs(segments)
+  const totalMinutes = totalNetMinutes(segments, breaks)
   const spans = segments.length
   const isActive = segments.some((s) => s.id === activeTaskId)
 
@@ -340,7 +346,7 @@ function TaskGroup({
                 <span key={tag} className="text-xs bg-secondary rounded px-1.5 py-0.5">{tag}</span>
               ))}
               <span className="text-xs font-semibold text-foreground tabular-nums">
-                {formatMinutes(total / 60000)}
+                {formatMinutes(totalMinutes)}
               </span>
               {spans > 1 && (
                 <span className="text-xs text-muted-foreground">
@@ -471,9 +477,7 @@ function TaskGroup({
                     {fmtTime(seg.startTime)} → {seg.endTime ? fmtTime(seg.endTime) : '…'}
                     <span className="ml-2 text-foreground/70">
                       {seg.endTime
-                        ? formatMinutes(
-                            (new Date(seg.endTime).getTime() - new Date(seg.startTime).getTime()) / 60000
-                          )
+                        ? formatMinutes(netTaskMinutes(seg.startTime, seg.endTime, breaks))
                         : seg.id === activeTaskId
                           ? <span className="text-green-500">en curso</span>
                           : '—'}
@@ -514,6 +518,7 @@ export function TaskList({
   allowResume = true,
   showBilledCheckbox,
   entryDate,
+  breaks = [],
 }: {
   tasks: TaskWithTags[]
   entryId: string
@@ -521,28 +526,58 @@ export function TaskList({
   allowResume?: boolean
   showBilledCheckbox?: boolean
   entryDate?: string
+  breaks?: BreakInterval[]
 }) {
+  const toast = useToast()
   const [billed, setBilled] = useState<BilledMap>(new Map())
+  // Local toggles the user makes before the server fetch resolves; re-applied on
+  // top of the server response so an in-flight GET can't clobber a fresh change.
+  const overridesRef = useRef<Map<string, string | null>>(new Map())
+
   useEffect(() => {
     if (!showBilledCheckbox) return
     setBilled(loadBilled())
-    fetchBilledFromServer().then(setBilled)
+    fetchBilledFromServer().then((serverMap) => {
+      const merged = new Map(serverMap)
+      overridesRef.current.forEach((v, k) => {
+        if (v === null) merged.delete(k)
+        else merged.set(k, v)
+      })
+      saveBilled(merged)
+      setBilled(merged)
+    })
   }, [showBilledCheckbox])
 
-  function toggleBilled(desc: string, segments: TaskWithTags[]) {
+  async function toggleBilled(desc: string, segments: TaskWithTags[]) {
     if (!entryDate) return
     const key = billedKey(entryDate, desc)
     const sig = groupSignature(segments)
-    const next = new Map(billed)
-    if (next.get(key) === sig) {
-      next.delete(key)
-      unmarkBilledOnServer(entryDate, desc)
-    } else {
+    const prev = billed
+    const willMark = prev.get(key) !== sig
+
+    // Optimistic update
+    const next = new Map(prev)
+    if (willMark) {
       next.set(key, sig)
-      markBilledOnServer(entryDate, desc, sig)
+      overridesRef.current.set(key, sig)
+    } else {
+      next.delete(key)
+      overridesRef.current.set(key, null)
     }
     setBilled(next)
     saveBilled(next)
+
+    const ok = willMark
+      ? await markBilledOnServer(entryDate, desc, sig)
+      : await unmarkBilledOnServer(entryDate, desc)
+
+    if (!ok) {
+      // Roll back the optimistic change so UI matches the DB
+      overridesRef.current.delete(key)
+      setBilled(prev)
+      saveBilled(prev)
+      toast.error('No se pudo guardar el estado de imputación. Inténtalo de nuevo.')
+    }
   }
 
   if (tasks.length === 0) {
@@ -579,6 +614,7 @@ export function TaskList({
             allowResume={allowResume}
             isBilled={showBilledCheckbox ? isBilled : undefined}
             onToggleBilled={showBilledCheckbox ? () => toggleBilled(desc, segs) : undefined}
+            breaks={breaks}
           />
         )
       })}

@@ -7,6 +7,7 @@ import { listEntries } from '@/lib/db/queries/entries'
 import { listTasksForEntries } from '@/lib/db/queries/tasks'
 import { getBreaksForEntries } from '@/lib/db/queries/entry-breaks'
 import { breakToInterval } from '@/lib/business/breaks'
+import { netTaskMinutes } from '@/lib/business/break-math'
 import { parseTaskTags } from '@/types/db'
 import type { Task } from '@/types/db'
 
@@ -50,35 +51,27 @@ export async function GET(req: NextRequest) {
   const tasksMap = listTasksForEntries(entryIds)
   const breaksMap = getBreaksForEntries(entryIds)
 
-  function computeWorked(entryId: string, entryDate: string): number {
-    const entryTasks = tasksMap.get(entryId) ?? []
-    const entryBreaks = breaksMap.get(entryId) ?? []
-    const breakIntervals = entryBreaks.map((b) => breakToInterval(b, entryDate))
+  function breakIntervalsFor(entryId: string, entryDate: string) {
+    return (breaksMap.get(entryId) ?? []).map((b) => breakToInterval(b, entryDate))
+  }
 
-    return entryTasks
+  function computeWorked(entryId: string, breakIntervals: ReturnType<typeof breakIntervalsFor>): number {
+    return (tasksMap.get(entryId) ?? [])
       .filter((t: Task) => t.startTime && t.endTime)
-      .reduce((sum: number, t: Task) => {
-        const taskStart = new Date(t.startTime).getTime()
-        const taskEnd = new Date(t.endTime!).getTime()
-        const taskMs = taskEnd - taskStart
-        const overlapMs = breakIntervals.reduce((ov, bi) => {
-          const oStart = Math.max(taskStart, new Date(bi.startIso).getTime())
-          const oEnd = Math.min(taskEnd, new Date(bi.endIso).getTime())
-          return ov + Math.max(0, oEnd - oStart)
-        }, 0)
-        return sum + Math.max(0, taskMs - overlapMs) / 60_000
-      }, 0)
+      .reduce((sum: number, t: Task) => sum + netTaskMinutes(t.startTime, t.endTime!, breakIntervals), 0)
   }
 
   const days = weekDates.map((dayDate) => {
     const entry = entryByDate.get(dayDate)
+    const breaks = entry ? breakIntervalsFor(entry.id, entry.date) : []
     const tasks = entry ? (tasksMap.get(entry.id) ?? []).map(parseTaskTags) : []
-    const workedMinutes = entry ? computeWorked(entry.id, entry.date) : 0
+    const workedMinutes = entry ? computeWorked(entry.id, breaks) : 0
     const expectedMinutes = entry?.expectedMinutes ?? 0
     return {
       date: dayDate,
       entry: entry ?? null,
       tasks,
+      breaks,
       workedMinutes,
       expectedMinutes,
       dayBalance: workedMinutes - expectedMinutes,

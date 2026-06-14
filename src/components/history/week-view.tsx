@@ -7,6 +7,9 @@ import { formatMinutes } from '@/lib/utils'
 import type { TaskWithTags } from '@/types/db'
 import { ArrowLeftBox, ArrowRightBox } from 'pixelarticons/react'
 import { useToast } from '@/components/ui/toast'
+import { netTaskMinutes } from '@/lib/business/break-math'
+
+type BreakInterval = { startIso: string; endIso: string }
 
 import { loadBilled, saveBilled, billedKey, groupSignature, fetchBilledFromServer, markBilledOnServer, unmarkBilledOnServer, type BilledMap } from '@/lib/billed'
 
@@ -53,6 +56,7 @@ interface DayData {
   date: string
   entry: { id: string; expectedMinutes: number; endTime: string | null } | null
   tasks: TaskWithTags[]
+  breaks: BreakInterval[]
   workedMinutes: number
   expectedMinutes: number
   dayBalance: number
@@ -87,26 +91,27 @@ interface TaskGroup {
   signature: string
 }
 
-function groupTasks(tasks: TaskWithTags[]): TaskGroup[] {
-  const map = new Map<string, { tags: string[]; totalMs: number; sessions: number; notes: string | null; tasks: TaskWithTags[] }>()
+function groupTasks(tasks: TaskWithTags[], breaks: BreakInterval[]): TaskGroup[] {
+  const map = new Map<string, { tags: string[]; totalMinutes: number; sessions: number; notes: string | null; tasks: TaskWithTags[] }>()
   for (const t of tasks) {
     if (!t.endTime) continue
-    const ms = new Date(t.endTime).getTime() - new Date(t.startTime).getTime()
+    // Net minutes (break overlap subtracted) so per-task totals sum to the day's worked total
+    const minutes = netTaskMinutes(t.startTime, t.endTime, breaks)
     const existing = map.get(t.description)
     if (existing) {
-      existing.totalMs += ms
+      existing.totalMinutes += minutes
       existing.sessions++
       existing.tasks.push(t)
       // Keep latest non-null notes
       if (t.notes) existing.notes = t.notes
     } else {
-      map.set(t.description, { tags: t.tags, totalMs: ms, sessions: 1, notes: t.notes, tasks: [t] })
+      map.set(t.description, { tags: t.tags, totalMinutes: minutes, sessions: 1, notes: t.notes, tasks: [t] })
     }
   }
   return Array.from(map.entries()).map(([description, v]) => ({
     description,
     tags: v.tags,
-    totalMinutes: v.totalMs / 60000,
+    totalMinutes: v.totalMinutes,
     sessions: v.sessions,
     notes: v.notes,
     signature: groupSignature(v.tasks),
@@ -120,7 +125,7 @@ function DayCard({ day, index, billed, onToggleBilled }: {
 }) {
   const today = isToday(day.date)
   const hasWork = day.workedMinutes > 0 || day.tasks.length > 0
-  const groups = groupTasks(day.tasks)
+  const groups = groupTasks(day.tasks, day.breaks)
   const progress = day.expectedMinutes > 0
     ? Math.min((day.workedMinutes / day.expectedMinutes) * 100, 100)
     : 0
@@ -224,29 +229,54 @@ export function WeekView() {
   const [billed, setBilled] = useState<BilledMap>(() => new Map())
   const billedRef = useRef(billed)
   useEffect(() => { billedRef.current = billed }, [billed])
+  // Local toggles made before the server fetch resolves; re-applied on top of the
+  // server response so an in-flight GET can't clobber a fresh change.
+  const overridesRef = useRef<Map<string, string | null>>(new Map())
 
   // Hydrate browser-only preferences after mount to avoid SSR/client divergence.
   useEffect(() => {
     setShowWeekends(localStorage.getItem(WEEKEND_KEY) === 'true')
     setBilled(loadBilled())
-    fetchBilledFromServer().then(setBilled)
-  }, [])
-
-  const toggleBilled = useCallback((date: string, description: string, signature: string) => {
-    setBilled((prev) => {
-      const next = new Map(prev)
-      const key = billedKey(date, description)
-      if (next.get(key) === signature) {
-        next.delete(key)
-        unmarkBilledOnServer(date, description)
-      } else {
-        next.set(key, signature)
-        markBilledOnServer(date, description, signature)
-      }
-      saveBilled(next)
-      return next
+    fetchBilledFromServer().then((serverMap) => {
+      const merged = new Map(serverMap)
+      overridesRef.current.forEach((v, k) => {
+        if (v === null) merged.delete(k)
+        else merged.set(k, v)
+      })
+      saveBilled(merged)
+      setBilled(merged)
     })
   }, [])
+
+  const toggleBilled = useCallback(async (date: string, description: string, signature: string) => {
+    const key = billedKey(date, description)
+    const prevMap = billedRef.current
+    const willMark = prevMap.get(key) !== signature
+
+    // Optimistic update
+    const next = new Map(prevMap)
+    if (willMark) {
+      next.set(key, signature)
+      overridesRef.current.set(key, signature)
+    } else {
+      next.delete(key)
+      overridesRef.current.set(key, null)
+    }
+    setBilled(next)
+    saveBilled(next)
+
+    const ok = willMark
+      ? await markBilledOnServer(date, description, signature)
+      : await unmarkBilledOnServer(date, description)
+
+    if (!ok) {
+      // Roll back so UI matches the DB
+      overridesRef.current.delete(key)
+      setBilled(prevMap)
+      saveBilled(prevMap)
+      toast.error('No se pudo guardar el estado de imputación. Inténtalo de nuevo.')
+    }
+  }, [toast])
 
   useEffect(() => {
     setLoading(true)
@@ -259,7 +289,7 @@ export function WeekView() {
         // Detect billed entries whose underlying tasks changed
         const currentSigs = new Map<string, string>()
         for (const day of d.days) {
-          for (const g of groupTasks(day.tasks)) {
+          for (const g of groupTasks(day.tasks, day.breaks)) {
             currentSigs.set(billedKey(day.date, g.description), g.signature)
           }
         }

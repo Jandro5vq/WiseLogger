@@ -2,6 +2,10 @@ import { listEntries, getEntryById } from '@/lib/db/queries/entries'
 import { listTasksForEntry, listTasksForEntries } from '@/lib/db/queries/tasks'
 import { getEntryBreaks, getBreaksForEntries } from '@/lib/db/queries/entry-breaks'
 import { breakToInterval } from '@/lib/business/breaks'
+import { netTaskMinutes } from '@/lib/business/break-math'
+
+// Re-export so existing importers (e.g. API routes) keep working.
+export { netTaskMinutes }
 
 export interface DaySummary {
   date: string
@@ -15,29 +19,6 @@ export interface BalanceResult {
   totalWorkedMinutes: number
   totalExpectedMinutes: number
   cumulativeBalance: number
-}
-
-/**
- * Net task duration minus any overlapping break time, in minutes.
- * Known limitation: tasks spanning midnight are not split across entries.
- * Breaks on the next calendar day won't be deducted from midnight-spanning tasks.
- */
-export function netTaskMinutes(
-  startTime: string,
-  endTime: string,
-  breakIntervals: Array<{ startIso: string; endIso: string }>
-): number {
-  const taskStart = new Date(startTime).getTime()
-  const taskEnd = new Date(endTime).getTime()
-  const taskMs = taskEnd - taskStart
-
-  const overlapMs = breakIntervals.reduce((ov, bi) => {
-    const oStart = Math.max(taskStart, new Date(bi.startIso).getTime())
-    const oEnd = Math.min(taskEnd, new Date(bi.endIso).getTime())
-    return ov + Math.max(0, oEnd - oStart)
-  }, 0)
-
-  return Math.max(0, taskMs - overlapMs) / 60_000
 }
 
 /**

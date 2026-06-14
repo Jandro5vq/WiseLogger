@@ -25,6 +25,8 @@ export function listTasksForEntry(entryId: string) {
 }
 
 export function getFavorites(userId: string, limit = 10) {
+  // Most recently used task descriptions first (one row per description).
+  // `tags` reflects the latest-started occurrence via max(startTime).
   return db
     .select({
       description: tasks.description,
@@ -34,7 +36,7 @@ export function getFavorites(userId: string, limit = 10) {
     .from(tasks)
     .where(eq(tasks.userId, userId))
     .groupBy(tasks.description)
-    .orderBy(sql`count(*) desc`)
+    .orderBy(sql`max(${tasks.startTime}) desc`)
     .limit(limit)
     .all()
 }

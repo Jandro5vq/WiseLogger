@@ -2,14 +2,16 @@
 
 import { useEffect, useState } from 'react'
 import { formatMinutes } from '@/lib/utils'
+import { breakOverlapMs } from '@/lib/business/break-math'
 
 interface TodayStatsProps {
   entryStartTime: string           // fallback if no tasks yet
   firstTaskStartTime?: string      // drives the expectedEnd reference
-  completedTaskMinutes: number     // raw sum of finished task durations (no break subtraction)
+  completedTaskMinutes: number     // net sum of finished task durations (break time subtracted)
   expectedMinutes: number
   totalBreakMinutes: number        // sum of today's breaks (shifts expectedEnd)
   activeTaskStartTime?: string     // ISO — for live "worked" ticking
+  breaks?: { startIso: string; endIso: string }[] // today's breaks, to keep live time net
 }
 
 function fmtHHMM(ms: number): string {
@@ -24,6 +26,7 @@ export function TodayStats({
   expectedMinutes,
   totalBreakMinutes,
   activeTaskStartTime,
+  breaks = [],
 }: TodayStatsProps) {
   const [now, setNow] = useState(() => Date.now())
 
@@ -38,9 +41,10 @@ export function TodayStats({
     : new Date(entryStartTime).getTime()
   const expectedEndMs = refMs + (expectedMinutes + totalBreakMinutes) * 60_000
 
-  // ── task time (live, ticks with active task) — raw durations, no break deduction ──
+  // ── task time (live, ticks with active task) — net durations, break time subtracted ──
+  const activeStartMs = activeTaskStartTime ? new Date(activeTaskStartTime).getTime() : 0
   const activeMs = activeTaskStartTime
-    ? Math.max(0, now - new Date(activeTaskStartTime).getTime())
+    ? Math.max(0, now - activeStartMs - breakOverlapMs(activeStartMs, now, breaks))
     : 0
   const liveTaskMinutes = completedTaskMinutes + activeMs / 60_000
 

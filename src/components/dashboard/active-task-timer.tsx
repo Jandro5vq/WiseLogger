@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatElapsed, todayISO, isoToLocalInput } from '@/lib/utils'
 import { DateTimeInput } from '@/components/ui/date-time-input'
+import { useToast } from '@/components/ui/toast'
 import { PenSquare } from 'pixelarticons/react'
 import type { TaskWithTags } from '@/types/db'
 
@@ -16,6 +17,7 @@ interface ActiveTaskTimerProps {
 
 export function ActiveTaskTimer({ task, loadedDate, entryId, breaks }: ActiveTaskTimerProps) {
   const router = useRouter()
+  const toast = useToast()
   const [, startTransition] = useTransition()
   const [elapsedMs, setElapsedMs] = useState(0)
   const [stopped, setStopped] = useState(false)
@@ -77,31 +79,47 @@ export function ActiveTaskTimer({ task, loadedDate, entryId, breaks }: ActiveTas
     async function handleStop() { await stopTask() }
     window.addEventListener('wl:stop-task', handleStop)
     return () => window.removeEventListener('wl:stop-task', handleStop)
-  })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   async function splitAtBreak(b: { startIso: string; endIso: string }) {
-    await fetch(`/api/tasks/${task.id}/stop`, {
+    const res = await fetch(`/api/tasks/${task.id}/stop`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ endTime: b.startIso }),
     })
+    if (!res.ok) {
+      splitFiredRef.current = false // allow retry on the next tick
+      toast.error('No se pudo pausar la tarea automáticamente')
+      return
+    }
     inBreakRef.current = b
     setBreakDisplay(b)
   }
 
   async function resumeAfterBreak(startTime: string) {
-    await fetch(`/api/entries/${entryId}/tasks`, {
+    const res = await fetch(`/api/entries/${entryId}/tasks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ description: task.description, tags: task.tags, startTime }),
     })
+    if (!res.ok) {
+      resumingRef.current = false // allow retry on the next tick
+      toast.error('No se pudo reanudar la tarea automáticamente')
+      return
+    }
     startTransition(() => router.refresh())
   }
 
   async function stopTask() {
-    setStopped(true)
     setStopping(true)
-    await fetch(`/api/tasks/${task.id}/stop`, { method: 'POST' })
+    const res = await fetch(`/api/tasks/${task.id}/stop`, { method: 'POST' })
+    if (!res.ok) {
+      setStopping(false)
+      toast.error('No se pudo detener la tarea')
+      return
+    }
+    setStopped(true)
     setStopping(false)
     startTransition(() => router.refresh())
   }
