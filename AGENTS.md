@@ -7,6 +7,19 @@ Notes for future agents (and humans) working on this repo.
 **The displayed app version is the git tag on `main`.** Releases are **always** tagged
 on `main` — going forward, every release must have a corresponding annotated tag.
 
+### Semantic versioning (`MAJOR.MINOR.PATCH`)
+
+Baseline is **`v1.1.3`**. Bump from there following semver:
+
+- **PATCH** (`1.1.3 → 1.1.4`): bug fixes, no behaviour changes for the user.
+- **MINOR** (`1.1.3 → 1.2.0`): new features, **and changes to time/calculation algorithms**
+  (split/merge/balance/auto-close logic, etc.).
+- **MAJOR** (`1.1.3 → 2.0.0`): breaking changes (data model migrations that aren't
+  backward-compatible, removed endpoints, etc.).
+
+Keep `package.json` `version` in sync with the tag (it's the fallback when git is
+unavailable), but the **tag on `main` is the source of truth**.
+
 ### How the version reaches the UI
 
 1. `next.config.mjs` → `resolveAppVersion()` computes the version at **build time** and
@@ -42,5 +55,6 @@ When cutting a release:
 4. Build with the tag passed through (`--build-arg APP_VERSION=...`) so the deployed
    container shows the right version.
 
-> Note: until the first tag exists, `git describe --tags --always` returns the short
-> commit hash. That's expected — tag `main` to start showing real versions.
+> Note: on commits made after a tag, `git describe --tags` returns `vX.Y.Z-N-gHASH`
+> (N commits past the tag) until the next release is tagged. A clean tagged commit
+> shows just `vX.Y.Z`.
