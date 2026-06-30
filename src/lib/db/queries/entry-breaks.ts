@@ -13,6 +13,11 @@ export function getEntryBreakById(id: string) {
   return db.select().from(entryBreaks).where(eq(entryBreaks.id, id)).get()
 }
 
+/** All break rows across every user/entry. Used by the one-time legacy normalizer. */
+export function listAllEntryBreaks() {
+  return db.select().from(entryBreaks).all()
+}
+
 export function createEntryBreak(data: typeof entryBreaks.$inferInsert) {
   return db.insert(entryBreaks).values(data).returning().get()
 }

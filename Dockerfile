@@ -21,6 +21,12 @@ FROM base AS builder
 WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
+# The displayed app version comes from the git tag on main. `.git` is not in the build
+# context (see .dockerignore), so the tag must be passed in:
+#   docker build --build-arg APP_VERSION=$(git describe --tags) .
+# Falls back to the package.json version when omitted (see next.config.mjs).
+ARG APP_VERSION
+ENV APP_VERSION=${APP_VERSION}
 RUN npm run build
 
 FROM base AS runner

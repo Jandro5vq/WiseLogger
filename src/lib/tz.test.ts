@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { hhmmToUTC, dateStringInTz, addDateStr, localMidnightUtcMs, splitAtMidnights, getWeekBounds } from './tz'
+import { hhmmToUTC, dateStringInTz, addDateStr, localMidnightUtcMs, splitAtMidnights, getWeekBounds, weekdayOf, monthOf } from './tz'
 
 // Use DST-free zones so the expected offsets are stable year-round:
 //   America/Bogota = UTC-5, Asia/Kolkata = UTC+5:30
@@ -41,6 +41,19 @@ describe('addDateStr', () => {
     expect(addDateStr('2026-06-14', 1)).toBe('2026-06-15')
     expect(addDateStr('2026-06-30', 1)).toBe('2026-07-01')
     expect(addDateStr('2026-03-01', -1)).toBe('2026-02-28')
+  })
+})
+
+describe('weekdayOf / monthOf', () => {
+  it('returns the calendar weekday independent of host timezone', () => {
+    expect(weekdayOf('2026-06-30')).toBe(2) // Tuesday
+    expect(weekdayOf('2026-06-28')).toBe(0) // Sunday
+    expect(weekdayOf('2026-06-27')).toBe(6) // Saturday
+  })
+
+  it('returns the calendar month 1–12', () => {
+    expect(monthOf('2026-01-15')).toBe(1)
+    expect(monthOf('2026-12-31')).toBe(12)
   })
 })
 

@@ -6,7 +6,7 @@ import { getEntryBreakById, createEntryBreak, updateEntryBreak, deleteEntryBreak
 import { autoCreateEntry, todayDateString } from '@/lib/business/tasks'
 import { getUserById } from '@/lib/db/queries/users'
 import { computeBalance, computeEntryWorkedMinutes } from '@/lib/business/balance'
-import { buildEntryIntervals, detectOverlap, breakToInterval } from '@/lib/business/breaks'
+import { buildEntryIntervals, detectOverlap, breakToInterval, toBreakStartIso } from '@/lib/business/breaks'
 import { parseTaskTags } from '@/types/db'
 import { formatMinutes } from '@/lib/utils'
 
@@ -278,7 +278,7 @@ export const mcpTools: McpTool[] = [
     schema: z.object({
       date: z.string().optional().describe('Fecha YYYY-MM-DD (por defecto hoy)'),
       break_start: z.string().describe('Hora de inicio de la pausa en formato HH:MM'),
-      duration_minutes: z.number().describe('Duración de la pausa en minutos'),
+      duration_minutes: z.number().int().positive().max(24 * 60).describe('Duración de la pausa en minutos (> 0)'),
       label: z.string().optional().describe('Etiqueta opcional, p. ej. "Comida"'),
     }),
     execute: (args, userId) => {
@@ -292,7 +292,12 @@ export const mcpTools: McpTool[] = [
       const targetDate = date ?? getUserToday(userId)
       const entry = autoCreateEntry(userId, targetDate)
 
-      const { startIso, endIso } = breakToInterval({ breakStart: break_start, durationMinutes: duration_minutes }, targetDate)
+      // Persist an absolute ISO instant so the break is read back identically
+      // regardless of the server's timezone.
+      const tz = getUserById(userId)?.timezone ?? 'UTC'
+      const breakStartIso = toBreakStartIso(break_start, targetDate, tz)
+
+      const { startIso, endIso } = breakToInterval({ breakStart: breakStartIso, durationMinutes: duration_minutes }, targetDate)
       const existing = buildEntryIntervals(entry.id, targetDate)
       if (detectOverlap(existing, { start: new Date(startIso).getTime(), end: new Date(endIso).getTime() })) {
         return { error: 'La pausa se solapa con una tarea o pausa existente' }
@@ -302,7 +307,7 @@ export const mcpTools: McpTool[] = [
         id: uuidv4(),
         entryId: entry.id,
         userId,
-        breakStart: break_start,
+        breakStart: breakStartIso,
         durationMinutes: duration_minutes,
         label: label ?? null,
         fromRuleId: null,
@@ -316,7 +321,7 @@ export const mcpTools: McpTool[] = [
     schema: z.object({
       break_id: z.string().describe('ID de la pausa'),
       break_start: z.string().optional().describe('Nueva hora de inicio HH:MM'),
-      duration_minutes: z.number().optional().describe('Nueva duración en minutos'),
+      duration_minutes: z.number().int().positive().max(24 * 60).optional().describe('Nueva duración en minutos (> 0)'),
       label: z.string().optional().describe('Nueva etiqueta'),
     }),
     execute: (args, userId) => {
@@ -330,11 +335,14 @@ export const mcpTools: McpTool[] = [
       const b = getEntryBreakById(break_id)
       if (!b || b.userId !== userId) return { error: 'Pausa no encontrada' }
 
-      const newBreakStart = break_start ?? b.breakStart
+      // Need entry date for overlap check and ISO normalization
+      const breakEntry = getEntryById(b.entryId)
+      const tz = getUserById(userId)?.timezone ?? 'UTC'
+      const newBreakStart = break_start !== undefined && breakEntry
+        ? toBreakStartIso(break_start, breakEntry.date, tz)
+        : b.breakStart
       const newDuration = duration_minutes ?? b.durationMinutes
 
-      // Need entry date for overlap check
-      const breakEntry = getEntryById(b.entryId)
       if (breakEntry) {
         const { startIso, endIso } = breakToInterval({ breakStart: newBreakStart, durationMinutes: newDuration }, breakEntry.date)
         const existing = buildEntryIntervals(b.entryId, breakEntry.date, { excludeBreakId: b.id })
@@ -344,7 +352,7 @@ export const mcpTools: McpTool[] = [
       }
 
       const updates: Record<string, unknown> = {}
-      if (break_start !== undefined) updates.breakStart = break_start
+      if (break_start !== undefined) updates.breakStart = newBreakStart
       if (duration_minutes !== undefined) updates.durationMinutes = duration_minutes
       if (label !== undefined) updates.label = label
 
