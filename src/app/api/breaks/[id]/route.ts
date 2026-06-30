@@ -5,8 +5,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { getEntryBreakById, updateEntryBreak, deleteEntryBreak } from '@/lib/db/queries/entry-breaks'
 import { getEntryById } from '@/lib/db/queries/entries'
-import { buildEntryIntervals, detectOverlap, breakToInterval } from '@/lib/business/breaks'
+import { buildEntryIntervals, detectOverlap, breakToInterval, UpdateBreakSchema } from '@/lib/business/breaks'
 import { extendPreviousTaskOnBreakDelete, splitTasksAroundBreak, mergeContiguousSpans } from '@/lib/business/spans'
+import { parseBody } from '@/lib/api'
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession(req)
@@ -17,9 +18,17 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
-  const body = await req.json()
-  const newBreakStart = body.breakStart ?? b.breakStart
-  const newDuration = body.durationMinutes ?? b.durationMinutes
+  const parsed = parseBody(UpdateBreakSchema, await req.json())
+  if (!parsed.ok) return parsed.response
+  const newBreakStart = parsed.data.breakStart ?? b.breakStart
+  const newDuration = parsed.data.durationMinutes ?? b.durationMinutes
+
+  // Whitelist the columns a client may change — never write the raw body, which
+  // could otherwise reassign userId/entryId/fromRuleId.
+  const updates: Record<string, unknown> = {}
+  if (parsed.data.breakStart !== undefined) updates.breakStart = parsed.data.breakStart
+  if (parsed.data.durationMinutes !== undefined) updates.durationMinutes = parsed.data.durationMinutes
+  if (parsed.data.label !== undefined) updates.label = parsed.data.label
 
   // Validate overlap against other intervals (excluding this break)
   const entry = getEntryById(b.entryId)
@@ -40,7 +49,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   // Capture old break interval before updating
   const { startIso: oldStart, endIso: oldEnd } = breakToInterval(b, entry.date)
 
-  const updated = updateEntryBreak(params.id, body)
+  const updated = updateEntryBreak(params.id, updates)
 
   // Recompute: undo old break's effect on tasks, then apply new break's position
   extendPreviousTaskOnBreakDelete(b.entryId, oldStart, oldEnd)

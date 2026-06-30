@@ -9,7 +9,7 @@ import { getEntryById } from '@/lib/db/queries/entries'
 import { parseTaskTags } from '@/types/db'
 import { breakToInterval, type Interval } from '@/lib/business/breaks'
 import { getEntryBreaks } from '@/lib/db/queries/entry-breaks'
-import { adjustAdjacentTasksForEdit, splitIntervalAroundBreaks, mergeContiguousSpans } from '@/lib/business/spans'
+import { adjustAdjacentTasksForEdit, splitIntervalAroundBreaks, mergeContiguousSpans, splitEntryTasksAcrossMidnights } from '@/lib/business/spans'
 import { v4 as uuidv4 } from 'uuid'
 import { createTask } from '@/lib/db/queries/tasks'
 import { sqlite } from '@/lib/db'
@@ -93,8 +93,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
             })
           }
         })()
+        splitEntryTasksAcrossMidnights(task.entryId, session.user.id, session.user.timezone)
         mergeContiguousSpans(task.entryId)
-        const refreshed = parseTaskTags((await import('@/lib/db/queries/tasks')).getTaskById(params.id)!)
+        const refreshed = parseTaskTags(getTaskById(params.id)!)
         return NextResponse.json({ task: refreshed, deletedDescriptions })
       }
 
@@ -104,9 +105,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     }
   }
 
-  const updated = updateTask(params.id, updates)
+  updateTask(params.id, updates)
+  // If the edit pushed the task across a local midnight, split it into per-day
+  // segments — mirrors the stop endpoint so both writers keep the day-split invariant.
+  splitEntryTasksAcrossMidnights(task.entryId, session.user.id, session.user.timezone)
   mergeContiguousSpans(task.entryId)
-  return NextResponse.json({ task: parseTaskTags(updated!), deletedDescriptions })
+  const refreshed = getTaskById(params.id)
+  return NextResponse.json({ task: parseTaskTags(refreshed!), deletedDescriptions })
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {

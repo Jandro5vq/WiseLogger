@@ -6,8 +6,9 @@ import { v4 as uuidv4 } from 'uuid'
 import { getSession } from '@/lib/auth/session'
 import { getEntryById } from '@/lib/db/queries/entries'
 import { getEntryBreaks, createEntryBreak } from '@/lib/db/queries/entry-breaks'
-import { breakToInterval, detectOverlap } from '@/lib/business/breaks'
+import { breakToInterval, detectOverlap, CreateBreakSchema } from '@/lib/business/breaks'
 import { splitTasksAroundBreak, mergeContiguousSpans } from '@/lib/business/spans'
+import { parseBody } from '@/lib/api'
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getSession(_req)
@@ -30,12 +31,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
-  const body = await req.json()
-  const { breakStart, durationMinutes, label } = body
-
-  if (!breakStart || durationMinutes == null) {
-    return NextResponse.json({ error: 'breakStart y durationMinutes son obligatorios' }, { status: 400 })
-  }
+  const parsed = parseBody(CreateBreakSchema, await req.json())
+  if (!parsed.ok) return parsed.response
+  const { breakStart, durationMinutes, label } = parsed.data
 
   const { startIso, endIso } = breakToInterval({ breakStart, durationMinutes }, entry.date)
 

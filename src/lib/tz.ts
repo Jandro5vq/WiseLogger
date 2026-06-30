@@ -51,6 +51,21 @@ export function dateStringInTz(instant: Date, timeZone = 'UTC'): string {
   }
 }
 
+/**
+ * Day-of-week (0=Sun … 6=Sat) of a YYYY-MM-DD calendar date. The weekday is an
+ * intrinsic property of the date label, so it is computed via UTC and never flips
+ * on the host's local offset — unlike `new Date(dateStr).getDay()`, which reads the
+ * host timezone and can land on the wrong day for off-by-one parses.
+ */
+export function weekdayOf(dateStr: string): number {
+  return new Date(`${dateStr}T00:00:00Z`).getUTCDay()
+}
+
+/** Calendar month (1–12) of a YYYY-MM-DD date. UTC-anchored, host-tz independent. */
+export function monthOf(dateStr: string): number {
+  return new Date(`${dateStr}T00:00:00Z`).getUTCMonth() + 1
+}
+
 /** Add `n` days to a YYYY-MM-DD string (calendar arithmetic, UTC-anchored). */
 export function addDateStr(dateStr: string, n: number): string {
   const d = new Date(`${dateStr}T00:00:00Z`)

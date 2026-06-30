@@ -1,4 +1,5 @@
 import { getScheduleRules } from '@/lib/db/queries/schedule-rules'
+import { weekdayOf, monthOf } from '@/lib/tz'
 
 /**
  * Resolves how many minutes are expected for a given user/date.
@@ -8,14 +9,13 @@ export function resolveExpectedMinutes(userId: string, date: string): number {
   const rules = getScheduleRules(userId)
   if (rules.length === 0) {
     // Hardcoded fallback when no rules exist at all
-    const day = new Date(date + 'T00:00:00').getDay()
+    const day = weekdayOf(date)
     if (day === 0 || day === 6) return 0 // weekends
     return 495 // 8h15m
   }
 
-  const d = new Date(date + 'T00:00:00')
-  const weekday = d.getDay() // 0=Sunday … 6=Saturday
-  const month = d.getMonth() + 1 // 1–12
+  const weekday = weekdayOf(date) // 0=Sunday … 6=Saturday
+  const month = monthOf(date) // 1–12
 
   // 1. Exact date match
   const dateRule = rules.find((r) => r.ruleType === 'date' && r.specificDate === date)

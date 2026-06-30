@@ -6,12 +6,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { v4 as uuidv4 } from 'uuid'
 import { getSession } from '@/lib/auth/session'
 import { getEntryById } from '@/lib/db/queries/entries'
-import { getActiveTask, createTask, updateTask, listTasksForEntry } from '@/lib/db/queries/tasks'
+import { getActiveTask, createTask, updateTask, listTasksForEntry, getTaskById } from '@/lib/db/queries/tasks'
 import { sqlite } from '@/lib/db'
 import { getEntryBreaks } from '@/lib/db/queries/entry-breaks'
 import { parseTaskTags } from '@/types/db'
 import { breakToInterval, buildEntryIntervals, detectOverlap } from '@/lib/business/breaks'
-import { adjustPrecedingTask, splitIntervalAroundBreaks, adjustAdjacentTasksForEdit, mergeContiguousSpans } from '@/lib/business/spans'
+import { adjustPrecedingTask, splitIntervalAroundBreaks, adjustAdjacentTasksForEdit, mergeContiguousSpans, splitEntryTasksAcrossMidnights } from '@/lib/business/spans'
 import { parseBody } from '@/lib/api'
 
 const CreateTaskSchema = z.object({
@@ -100,8 +100,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         )
       })()
 
+      splitEntryTasksAcrossMidnights(params.id, session.user.id, session.user.timezone)
       mergeContiguousSpans(params.id)
-      return NextResponse.json({ task: parseTaskTags(createdTasks[0]), deletedDescriptions }, { status: 201 })
+      // Re-fetch: the split/merge above may have trimmed the first segment.
+      const head = getTaskById(createdTasks[0].id) ?? createdTasks[0]
+      return NextResponse.json({ task: parseTaskTags(head), deletedDescriptions }, { status: 201 })
     }
   } else {
     // Active task: point-in-break check for startTime only
@@ -155,6 +158,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     })
   })()
 
+  splitEntryTasksAcrossMidnights(params.id, session.user.id, session.user.timezone)
   mergeContiguousSpans(params.id)
-  return NextResponse.json({ task: parseTaskTags(task), deletedDescriptions }, { status: 201 })
+  const created = endTime ? getTaskById(task.id) ?? task : task
+  return NextResponse.json({ task: parseTaskTags(created), deletedDescriptions }, { status: 201 })
 }

@@ -33,11 +33,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // no body or not JSON — use now
   }
 
-  // Clamp endTime to the earliest obstacle (existing completed span or break) that
-  // starts after the active task's own startTime and before the proposed endTime.
+  // Reject a stop time that is not strictly after the task's own start. Without this
+  // a caller-supplied endTime earlier than startTime would persist a negative-duration
+  // task (the aggregate math clamps it to 0, but the stored row is corrupt).
   const taskStart = new Date(task.startTime).getTime()
   const proposed = new Date(endTime).getTime()
+  if (Number.isNaN(proposed) || proposed <= taskStart) {
+    return NextResponse.json(
+      { error: 'La hora de fin debe ser posterior a la de inicio' },
+      { status: 400 }
+    )
+  }
 
+  // Clamp endTime to the earliest obstacle (existing completed span or break) that
+  // starts after the active task's own startTime and before the proposed endTime.
   const obstacles: number[] = []
 
   // Completed spans that would be overlapped

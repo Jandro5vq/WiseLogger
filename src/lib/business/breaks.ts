@@ -1,11 +1,40 @@
+import { z } from 'zod'
 import { v4 as uuidv4 } from 'uuid'
 import { getBreakRules } from '@/lib/db/queries/break-rules'
 import { getEntryBreaks, createEntryBreak, getEntryBreakById } from '@/lib/db/queries/entry-breaks'
 import { listTasksForEntry } from '@/lib/db/queries/tasks'
-import { hhmmToUTC } from '@/lib/tz'
+import { hhmmToUTC, weekdayOf } from '@/lib/tz'
 
 // Re-export for existing importers.
 export { hhmmToUTC }
+
+/** No break can be longer than a full day. */
+const MAX_BREAK_MINUTES = 24 * 60
+
+/** Validates break input on create: a non-empty start and a strictly positive, bounded duration. */
+export const CreateBreakSchema = z.object({
+  breakStart: z.string().min(1, 'breakStart es obligatorio'),
+  durationMinutes: z
+    .number()
+    .int('La duración debe ser un número entero de minutos')
+    .positive('La duración debe ser mayor que 0')
+    .max(MAX_BREAK_MINUTES, 'La duración de la pausa es demasiado larga'),
+  label: z.string().nullable().optional(),
+})
+
+/** Same fields as {@link CreateBreakSchema} but all optional, for partial edits. */
+export const UpdateBreakSchema = CreateBreakSchema.partial()
+
+/**
+ * Normalize a break's start value to a UTC ISO instant. Accepts either an ISO
+ * string (returned unchanged) or legacy 'HH:MM' local time, resolved against the
+ * entry date in the given timezone. Every writer should persist the result so that
+ * read-time interpretation never depends on the server's timezone.
+ */
+export function toBreakStartIso(value: string, dateStr: string, timezone = 'UTC'): string {
+  const isIso = /^\d{4}-\d{2}-\d{2}T/.test(value)
+  return isIso ? value : hhmmToUTC(dateStr, value, timezone)
+}
 
 // ─── interval helpers ─────────────────────────────────────────────────────────
 
@@ -29,7 +58,10 @@ export function breakToInterval(
   const startIso = isIso
     ? breakRec.breakStart
     : new Date(`${entryDate}T${breakRec.breakStart}:00`).toISOString()
-  const endIso = new Date(new Date(startIso).getTime() + breakRec.durationMinutes * 60_000).toISOString()
+  // Clamp to ≥0 so a corrupt/negative duration can never yield an inverted interval
+  // (endIso < startIso), which would break overlap math and span-carving downstream.
+  const durationMs = Math.max(0, breakRec.durationMinutes) * 60_000
+  const endIso = new Date(new Date(startIso).getTime() + durationMs).toISOString()
   return { startIso, endIso }
 }
 
@@ -89,8 +121,8 @@ export function applyBreakRulesForEntry(
   const existing = getEntryBreaks(entryId)
   const existingRuleIds = new Set(existing.map((b) => b.fromRuleId).filter(Boolean))
 
-  // Day-of-week for the entry date (0=Sun … 6=Sat)
-  const dayOfWeek = new Date(date + 'T12:00:00Z').getDay()
+  // Day-of-week for the entry date (0=Sun … 6=Sat), host-tz independent.
+  const dayOfWeek = weekdayOf(date)
 
   for (const rule of rules) {
     if (existingRuleIds.has(rule.id)) continue

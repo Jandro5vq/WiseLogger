@@ -177,12 +177,20 @@ export function extendPreviousTaskOnBreakDelete(
 
   if (!prevTask) return // nothing before the break, leave gap
 
-  // Extend previous task to cover the break
-  updateTask(prevTask.id, { endTime: breakEndIso })
+  // Extend the previous task to fill the gap — but never past a task that already
+  // begins inside it, or we'd create an overlap. Clamp to the earliest such start.
+  const prevEnd = new Date(prevTask.endTime!).getTime()
+  let limit = breakEnd
+  for (const t of tasks) {
+    if (t.id === prevTask.id) continue
+    const tStart = new Date(t.startTime).getTime()
+    if (tStart >= prevEnd && tStart < limit) limit = tStart
+  }
+  updateTask(prevTask.id, { endTime: new Date(limit).toISOString() })
 
-  // Auto-merge: check if the next span (starts at breakEnd) has the same description
+  // Auto-merge: if a same-description span starts exactly where we stopped, fuse them.
   const nextTask = completed.find(
-    (t) => t.id !== prevTask!.id && new Date(t.startTime).getTime() === breakEnd
+    (t) => t.id !== prevTask!.id && new Date(t.startTime).getTime() === limit
   )
   if (nextTask && nextTask.description === prevTask.description) {
     updateTask(prevTask.id, { endTime: nextTask.endTime })
@@ -317,6 +325,20 @@ export function splitTaskAcrossMidnights(taskId: string, userId: string, timezon
     }
     mergeContiguousSpans(entry.id)
   }
+}
+
+/**
+ * Splits every completed task in an entry across local midnights (see
+ * {@link splitTaskAcrossMidnights}). Use after an edit/create that may have moved a
+ * task across a day boundary, so the day-split invariant holds no matter which
+ * endpoint mutated the times. Snapshots the id list first because each split moves
+ * continuation segments into *other* day-entries.
+ */
+export function splitEntryTasksAcrossMidnights(entryId: string, userId: string, timezone: string): void {
+  const ids = listTasksForEntry(entryId)
+    .filter((t) => t.endTime)
+    .map((t) => t.id)
+  for (const id of ids) splitTaskAcrossMidnights(id, userId, timezone)
 }
 
 /**

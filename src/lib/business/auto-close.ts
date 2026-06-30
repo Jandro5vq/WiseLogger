@@ -3,6 +3,7 @@ import { listTasksForEntry, updateTask } from '@/lib/db/queries/tasks'
 import { listUsers } from '@/lib/db/queries/users'
 import { getEntryBreaks } from '@/lib/db/queries/entry-breaks'
 import { breakToInterval } from '@/lib/business/breaks'
+import { splitTasksAroundBreak, mergeContiguousSpans } from '@/lib/business/spans'
 import { dateStringInTz } from '@/lib/tz'
 import { env } from '@/lib/env'
 import type { Entry } from '@/types/db'
@@ -22,29 +23,39 @@ export function autoCloseEntry(entry: Entry): void {
     return
   }
 
-  const breaks = getEntryBreaks(entry.id)
-  const totalBreakMs = breaks.reduce((sum, b) => {
-    const { startIso, endIso } = breakToInterval(b, entry.date)
-    return sum + (new Date(endIso).getTime() - new Date(startIso).getTime())
-  }, 0)
+  const breakIntervals = getEntryBreaks(entry.id).map((b) => breakToInterval(b, entry.date))
+  const totalBreakMs = breakIntervals.reduce(
+    (sum, b) => sum + (new Date(b.endIso).getTime() - new Date(b.startIso).getTime()),
+    0
+  )
 
+  // Wall-clock end of a full day: start, plus the expected net work, plus every break
+  // taken during the day.
   const firstStartMs = new Date(tasks[0].startTime).getTime()
   const expectedEndMs = firstStartMs + entry.expectedMinutes * 60_000 + totalBreakMs
-  const expectedEndIso = new Date(expectedEndMs).toISOString()
 
-  const lastTask = tasks[tasks.length - 1]
-  const lastTaskStartMs = new Date(lastTask.startTime).getTime()
-  const lastTaskEndMs = lastTask.endTime ? new Date(lastTask.endTime).getTime() : -Infinity
+  const lastTask = tasks[tasks.length - 1] // tasks are ordered by startTime
+  const lastStartMs = new Date(lastTask.startTime).getTime()
+  const lastEndMs = lastTask.endTime ? new Date(lastTask.endTime).getTime() : lastStartMs
 
-  if (expectedEndMs > lastTaskEndMs && expectedEndMs > lastTaskStartMs) {
-    // Expected end is further than the last task's current end → extend it
-    updateTask(lastTask.id, { endTime: expectedEndIso })
-    updateEntry(entry.id, { endTime: expectedEndIso })
-  } else if (lastTask.endTime) {
-    // Last task already covers the expected duration → close entry at last task end
-    updateEntry(entry.id, { endTime: lastTask.endTime })
+  // Never end the day before the last activity. An active last task is always closed.
+  let endMs = Math.max(expectedEndMs, lastEndMs)
+  if (!lastTask.endTime && endMs <= lastStartMs) endMs = lastStartMs + 60_000 // keep span > 0
+  const endIso = new Date(endMs).toISOString()
+
+  if (endMs > lastEndMs) {
+    // Extend (or, if active, close) the last task to the day's end, then carve it back
+    // out of any breaks it now spans so no task ever overlaps a break and the net
+    // worked time matches the expected minutes.
+    updateTask(lastTask.id, { endTime: endIso })
+    for (const { startIso, endIso: bEnd } of breakIntervals) {
+      splitTasksAroundBreak(entry.id, entry.userId, startIso, bEnd)
+    }
+    mergeContiguousSpans(entry.id)
+    updateEntry(entry.id, { endTime: endIso })
   } else {
-    updateEntry(entry.id, { endTime: expectedEndIso })
+    // Last task already reaches the expected end → just close the entry at its end.
+    updateEntry(entry.id, { endTime: lastTask.endTime ?? endIso })
   }
 
   console.log(`[auto-close] Closed: ${entry.date} (user ${entry.userId})`)
