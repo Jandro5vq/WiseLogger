@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
+import { APP_VERSION } from '@/lib/version'
 import { Clock, Calendar, ChartBarBig, Settings2, User, Logout } from 'pixelarticons/react'
 
 const navItems = [
@@ -71,6 +72,10 @@ export function Sidebar({ isAdmin }: { isAdmin: boolean }) {
         <Logout width={20} height={20} className="text-red-400" />
         Cerrar sesión
       </button>
+
+      <span className="mt-2 px-3 text-xs text-muted-foreground tabular-nums" title="Versión de WiseLogger (tag de main)">
+        {APP_VERSION}
+      </span>
     </aside>
   )
 }

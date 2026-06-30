@@ -1,6 +1,11 @@
 services:
   wiselogger:
-    build: .
+    build:
+      context: .
+      args:
+        # Displayed app version = git tag on main. Pass it at build time, e.g.:
+        #   APP_VERSION=$(git describe --tags) docker compose build
+        APP_VERSION: ${APP_VERSION:-}
     image: wiselogger:latest
     container_name: wiselogger
     ports:
