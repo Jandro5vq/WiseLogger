@@ -13,4 +13,4 @@ npm-debug.log*
 README.md
 docs
 drizzle.config.ts
-drizzle/*.ts
+drizzle/drizzle.config.ts
