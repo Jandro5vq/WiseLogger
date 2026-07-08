@@ -6,6 +6,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { getEntryById, updateEntry, deleteEntry } from '@/lib/db/queries/entries'
 import { listTasksForEntry, updateTask } from '@/lib/db/queries/tasks'
+import { getEntryBreaks } from '@/lib/db/queries/entry-breaks'
+import { breakToInterval } from '@/lib/business/breaks'
+import { splitTasksAroundBreak, splitEntryTasksAcrossMidnights, mergeContiguousSpans } from '@/lib/business/spans'
 import { resolveExpectedMinutes } from '@/lib/business/schedule'
 import { parseBody } from '@/lib/api'
 
@@ -61,12 +64,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const updated = updateEntry(params.id, updates)
 
   const entryTasks = listTasksForEntry(params.id)
+  let tasksAdjusted = false
   if (data.adjustFirstTask && data.startTime && entryTasks.length > 0) {
     const first = entryTasks[0]
     const newStartMs = new Date(data.startTime).getTime()
     const firstEndMs = first.endTime ? new Date(first.endTime).getTime() : Infinity
     if (newStartMs < firstEndMs) {
       updateTask(first.id, { startTime: data.startTime })
+      tasksAdjusted = true
     }
   }
   if (data.adjustLastTask && data.endTime && entryTasks.length > 0) {
@@ -75,7 +80,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     const lastStartMs = new Date(last.startTime).getTime()
     if (newEndMs > lastStartMs) {
       updateTask(last.id, { endTime: data.endTime })
+      tasksAdjusted = true
     }
+  }
+
+  if (tasksAdjusted) {
+    // Same post-write pipeline as the other task writers: carve the moved spans
+    // around the entry's breaks, split anything pushed across a local midnight,
+    // then fuse touching same-task spans.
+    for (const b of getEntryBreaks(params.id)) {
+      const { startIso, endIso } = breakToInterval(b, entry.date)
+      splitTasksAroundBreak(params.id, session.user.id, startIso, endIso)
+    }
+    splitEntryTasksAcrossMidnights(params.id, session.user.id, session.user.timezone)
+    mergeContiguousSpans(params.id)
   }
 
   return NextResponse.json(updated)
