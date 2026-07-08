@@ -35,6 +35,7 @@ export function Sidebar({ isAdmin }: { isAdmin: boolean }) {
             <Link
               key={item.href}
               href={item.href}
+              aria-current={active ? 'page' : undefined}
               data-tour={item.href === '/settings' ? 'settings-link' : undefined}
               className={cn(
                 'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
@@ -52,6 +53,7 @@ export function Sidebar({ isAdmin }: { isAdmin: boolean }) {
         {isAdmin && (
           <Link
             href="/admin"
+            aria-current={pathname.startsWith('/admin') ? 'page' : undefined}
             className={cn(
               'flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors',
               pathname.startsWith('/admin')

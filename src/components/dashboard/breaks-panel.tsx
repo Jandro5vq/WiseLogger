@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useTransition } from 'react'
+import { useEffect, useState, useTransition } from 'react'
 import { TimeInput } from '@/components/ui/time-input'
 import { PenSquare, Cancel, Plus } from 'pixelarticons/react'
 import { useToast } from '@/components/ui/toast'
@@ -131,6 +131,10 @@ export function BreaksPanel({
   const [showAdd, setShowAdd] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
 
+  // Server refreshes (router.refresh / LiveRefresh) deliver fresh breaks via props;
+  // resync so the panel never shows stale rows after an external change.
+  useEffect(() => { setBreaks(initialBreaks) }, [initialBreaks])
+
   // add form local state
   const [addStart, setAddStart] = useState('')
   const [addDuration, setAddDuration] = useState('30')
@@ -172,10 +176,32 @@ export function BreaksPanel({
   }
 
   async function deleteBreak(id: string) {
+    const removed = breaks.find((b) => b.id === id)
     const res = await fetch(`/api/breaks/${id}`, { method: 'DELETE' })
     if (!res.ok) { toast.error('Error al eliminar la pausa'); return }
     setBreaks((prev) => prev.filter((b) => b.id !== id))
     startTransition(() => router.refresh())
+    if (!removed) return
+    toast.info('Pausa eliminada', {
+      action: {
+        label: 'Deshacer',
+        onClick: async () => {
+          // Re-create via POST — re-runs the carve logic, same as any new break.
+          const r = await fetch(`/api/entries/${entryId}/breaks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              breakStart: removed.breakStart,
+              durationMinutes: removed.durationMinutes,
+              label: removed.label ?? null,
+            }),
+          })
+          const data = await r.json().catch(() => ({}))
+          if (r.ok && data.break) setBreaks((prev) => [...prev, data.break])
+          startTransition(() => router.refresh())
+        },
+      },
+    })
   }
 
   function handleEdited(updated: EntryBreak, deletedDescriptions: string[]) {

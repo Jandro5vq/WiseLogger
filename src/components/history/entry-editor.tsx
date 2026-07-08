@@ -8,6 +8,7 @@ import type { Entry, TaskWithTags } from '@/types/db'
 import { TaskList } from '@/components/dashboard/task-list'
 import { DateTimeInput } from '@/components/ui/date-time-input'
 import { GapsAlert } from '@/components/ui/gaps-alert'
+import { useToast } from '@/components/ui/toast'
 import { Note } from 'pixelarticons/react'
 
 function useAdjustPref(key: string): [boolean, (v: boolean) => void] {
@@ -31,13 +32,24 @@ interface EntryEditorProps {
 }
 
 function AddTaskForm({ entryId, onAdded }: { entryId: string; onAdded: () => void }) {
+  const toast = useToast()
   const now = new Date()
   const [description, setDescription] = useState('')
   const [tagsInput, setTagsInput] = useState('')
+  const [notes, setNotes] = useState('')
   const [startTime, setStartTime] = useState(isoToLocalInput(now.toISOString()))
   const [endTime, setEndTime] = useState('')
+  const [favorites, setFavorites] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+
+  // Recent task names, newest first — surfaced as native datalist suggestions.
+  useEffect(() => {
+    fetch('/api/tasks/favorites')
+      .then((r) => (r.ok ? r.json() : []))
+      .then((d) => setFavorites(Array.isArray(d) ? d.map((f: { description: string }) => f.description) : []))
+      .catch(() => {})
+  }, [])
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
@@ -48,6 +60,7 @@ function AddTaskForm({ entryId, onAdded }: { entryId: string; onAdded: () => voi
     const body: Record<string, unknown> = {
       description: description.trim(),
       tags,
+      notes: notes.trim() || null,
       startTime: new Date(startTime).toISOString(),
     }
     if (endTime) body.endTime = new Date(endTime).toISOString()
@@ -62,7 +75,9 @@ function AddTaskForm({ entryId, onAdded }: { entryId: string; onAdded: () => voi
     if (!res.ok) { setError(data.error ?? 'Failed'); return }
     setDescription('')
     setTagsInput('')
+    setNotes('')
     setEndTime('')
+    toast.success('Tarea añadida')
     onAdded()
   }
 
@@ -75,14 +90,25 @@ function AddTaskForm({ entryId, onAdded }: { entryId: string; onAdded: () => voi
         onChange={(e) => setDescription(e.target.value)}
         required
         autoFocus
+        list="add-task-recent"
         className="w-full rounded border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
       />
+      <datalist id="add-task-recent">
+        {favorites.map((f) => <option key={f} value={f} />)}
+      </datalist>
       <input
         type="text"
         placeholder="Etiquetas (separadas por coma)"
         value={tagsInput}
         onChange={(e) => setTagsInput(e.target.value)}
         className="w-full rounded border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+      />
+      <textarea
+        placeholder="Notas (opcional)"
+        value={notes}
+        onChange={(e) => setNotes(e.target.value)}
+        rows={2}
+        className="w-full rounded border border-input bg-background px-2 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-ring resize-none"
       />
       <div className="grid grid-cols-2 gap-2">
         <div>
@@ -179,6 +205,7 @@ function WorkdayHoursEditor({ entry }: { entry: Entry }) {
 
 export function EntryEditor({ date, entry, tasks, breaks = [] }: EntryEditorProps) {
   const router = useRouter()
+  const toast = useToast()
   const [, startTransition] = useTransition()
   const [notes, setNotes] = useState(entry?.notes ?? '')
   const [saving, setSaving] = useState(false)
@@ -202,6 +229,7 @@ export function EntryEditor({ date, entry, tasks, breaks = [] }: EntryEditorProp
       body: JSON.stringify({ notes }),
     })
     setSaving(false)
+    toast.success('Notas guardadas')
     startTransition(() => router.refresh())
   }
 
@@ -226,6 +254,7 @@ export function EntryEditor({ date, entry, tasks, breaks = [] }: EntryEditorProp
   }
 
   const completedTasks = tasks.filter((t) => t.endTime)
+  const activeTask = tasks.find((t) => !t.endTime)
 
   return (
     <div className="space-y-4">
@@ -290,7 +319,7 @@ export function EntryEditor({ date, entry, tasks, breaks = [] }: EntryEditorProp
               onAdded={() => { setShowAdd(false); startTransition(() => router.refresh()) }}
             />
           )}
-          <TaskList tasks={completedTasks} entryId={entry.id} allowResume={false} entryDate={date} breaks={breaks} />
+          <TaskList tasks={tasks} entryId={entry.id} activeTaskId={activeTask?.id} allowResume={false} entryDate={date} breaks={breaks} />
         </div>
       </div>
 

@@ -35,14 +35,15 @@ function fmtTime(iso: string | null): string {
 }
 
 function taskDuration(t: TaskWithTags, breaks: BreakInterval[]): number {
-  if (!t.endTime) return 0
-  return taskWorkedMinutes(t.startTime, t.endTime, breaks)
+  // Active task: minutes elapsed so far (shown alongside the "en curso" badge).
+  return taskWorkedMinutes(t.startTime, t.endTime ?? new Date().toISOString(), breaks)
 }
 
 export function DayDetailDrawer({ date, onClose }: DayDetailDrawerProps) {
   const [data, setData] = useState<DayDetailPayload | null>(null)
   const [loading, setLoading] = useState(false)
   const panelRef = useRef<HTMLDivElement | null>(null)
+  const triggerRef = useRef<HTMLElement | null>(null)
 
   useEffect(() => {
     if (!date) { setData(null); return }
@@ -59,6 +60,36 @@ export function DayDetailDrawer({ date, onClose }: DayDetailDrawerProps) {
     return () => window.removeEventListener('keydown', onKey)
   }, [date, onClose])
 
+  // Focus management: move focus into the panel on open, trap Tab inside it, and
+  // return focus to the element that opened the drawer on close.
+  useEffect(() => {
+    if (!date) return
+    triggerRef.current = document.activeElement as HTMLElement | null
+    const panel = panelRef.current
+    panel?.focus()
+
+    function onKey(e: KeyboardEvent) {
+      if (e.key !== 'Tab' || !panel) return
+      const focusables = panel.querySelectorAll<HTMLElement>(
+        'a[href], button:not([disabled]), input, textarea, select, [tabindex]:not([tabindex="-1"])'
+      )
+      if (focusables.length === 0) { e.preventDefault(); return }
+      const first = focusables[0]
+      const last = focusables[focusables.length - 1]
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault(); last.focus()
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault(); first.focus()
+      }
+    }
+
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      triggerRef.current?.focus?.()
+    }
+  }, [date])
+
   if (!date) return null
 
   return (
@@ -70,7 +101,8 @@ export function DayDetailDrawer({ date, onClose }: DayDetailDrawerProps) {
       />
       <div
         ref={panelRef}
-        className="absolute right-0 top-0 bottom-0 w-full sm:w-[28rem] bg-card border-l border-border shadow-xl overflow-y-auto p-5 animate-in slide-in-from-right duration-200"
+        tabIndex={-1}
+        className="absolute right-0 top-0 bottom-0 w-full sm:w-[28rem] bg-card border-l border-border shadow-xl overflow-y-auto p-5 animate-in slide-in-from-right duration-200 focus:outline-none"
       >
         <div className="flex items-start justify-between gap-3 mb-4">
           <div>
@@ -132,9 +164,17 @@ export function DayDetailDrawer({ date, onClose }: DayDetailDrawerProps) {
                 {data.tasks.map((t) => (
                   <li key={t.id} className="rounded-md border border-border/60 bg-background px-3 py-2 flex items-center justify-between gap-2">
                     <div className="min-w-0">
-                      <p className="text-xs font-medium truncate" title={t.description}>{t.description}</p>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-xs font-medium truncate" title={t.description}>{t.description}</p>
+                        {!t.endTime && (
+                          <span className="flex items-center gap-1 shrink-0 text-[10px] text-green-600 dark:text-green-400 font-medium">
+                            <span className="animate-pulse w-1.5 h-1.5 rounded-full bg-green-500" />
+                            en curso
+                          </span>
+                        )}
+                      </div>
                       <p className="text-[11px] text-muted-foreground font-mono">
-                        {fmtTime(t.startTime)} → {fmtTime(t.endTime)}
+                        {fmtTime(t.startTime)} → {t.endTime ? fmtTime(t.endTime) : '…'}
                       </p>
                     </div>
                     <span className="shrink-0 text-xs font-mono font-semibold tabular-nums text-muted-foreground">

@@ -5,6 +5,7 @@ import { useState, useEffect, useRef, useTransition } from 'react'
 import { formatMinutes, isoToLocalInput } from '@/lib/utils'
 import type { TaskWithTags } from '@/types/db'
 import { DateTimeInput } from '@/components/ui/date-time-input'
+import { ConfirmButton } from '@/components/ui/confirm-button'
 import { Play, PenSquare, PlusBox, Note } from 'pixelarticons/react'
 import { useToast } from '@/components/ui/toast'
 import { taskWorkedMinutes, sumWorkedMinutes, type BreakInterval } from '@/lib/business/break-math'
@@ -73,6 +74,7 @@ function EditTaskForm({ task, onDone, siblingIds }: { task: TaskWithTags; onDone
       )
     }
     onDone()
+    toast.success('Tarea actualizada')
     startTransition(() => router.refresh())
   }
 
@@ -275,13 +277,33 @@ function TaskGroup({
     )
     setSavingNotes(false)
     setEditingNotes(false)
+    toast.success('Notas guardadas')
     startTransition(() => router.refresh())
   }
 
-  async function deleteSegment(id: string) {
-    const res = await fetch(`/api/tasks/${id}`, { method: 'DELETE' })
+  async function deleteSegment(seg: TaskWithTags) {
+    const res = await fetch(`/api/tasks/${seg.id}`, { method: 'DELETE' })
     if (!res.ok) { toast.error('Error al eliminar la tarea'); return }
     startTransition(() => router.refresh())
+    toast.info('Sesión eliminada', {
+      action: {
+        label: 'Deshacer',
+        onClick: async () => {
+          await fetch(`/api/entries/${entryId}/tasks`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              description: seg.description,
+              tags: seg.tags,
+              notes: seg.notes ?? null,
+              startTime: seg.startTime,
+              endTime: seg.endTime ?? undefined,
+            }),
+          })
+          startTransition(() => router.refresh())
+        },
+      },
+    })
   }
 
   async function deleteAll() {
@@ -385,13 +407,14 @@ function TaskGroup({
               <PenSquare width={16} height={16} />
             </button>
           )}
-          <button
-            onClick={(e) => { e.stopPropagation(); deleteAll() }}
+          <ConfirmButton
+            onConfirm={deleteAll}
+            confirmLabel={spans > 1 ? '¿Eliminar todo?' : '¿Eliminar?'}
             className="text-muted-foreground hover:text-destructive transition-colors p-0.5"
             aria-label="Eliminar" title="Eliminar"
           >
             <TrashIcon size={16} />
-          </button>
+          </ConfirmButton>
         </div>
       </div>
 
@@ -483,7 +506,7 @@ function TaskGroup({
                       </button>
                     )}
                     <button
-                      onClick={() => deleteSegment(seg.id)}
+                      onClick={() => deleteSegment(seg)}
                       className="text-muted-foreground hover:text-destructive p-0.5"
                     >
                       <TrashIcon size={14} />

@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { formatMinutes } from '@/lib/utils'
 import { TimeInput } from '@/components/ui/time-input'
+import { ConfirmButton } from '@/components/ui/confirm-button'
+import { useToast } from '@/components/ui/toast'
 import { ACCENTS, readStoredAccent, setStoredAccent, type AccentId } from '@/components/layout/accent-provider'
 
 // ─── Break rules ─────────────────────────────────────────────────────────────
@@ -593,6 +595,9 @@ function WeekendToggle() {
       </div>
       <button
         onClick={toggle}
+        role="switch"
+        aria-checked={showWeekends}
+        aria-label="Mostrar fin de semana"
         className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
           showWeekends ? 'bg-primary' : 'bg-muted'
         }`}
@@ -675,6 +680,9 @@ function WorkdayAdjustToggle({
       </div>
       <button
         onClick={toggle}
+        role="switch"
+        aria-checked={value}
+        aria-label={label}
         className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
           value ? 'bg-primary' : 'bg-muted'
         }`}
@@ -691,6 +699,7 @@ function WorkdayAdjustToggle({
 
 export default function SettingsPage() {
   const router = useRouter()
+  const toast = useToast()
   const [userId, setUserId] = useState('')
   const [rules, setRules] = useState<ScheduleRule[]>([])
   const [showAddForm, setShowAddForm] = useState(false)
@@ -736,6 +745,7 @@ export default function SettingsPage() {
     })
     setShowAddForm(false)
     setEditingId(null)
+    toast.success('Regla de horario guardada')
   }
 
   async function deleteBreakRule(id: string) {
@@ -751,6 +761,7 @@ export default function SettingsPage() {
     })
     setShowAddBreak(false)
     setEditingBreakId(null)
+    toast.success('Regla de pausa guardada')
   }
 
   async function generateApiKey() {
@@ -836,12 +847,12 @@ export default function SettingsPage() {
                     >
                       Editar
                     </button>
-                    <button
-                      onClick={() => deleteRule(rule.id)}
+                    <ConfirmButton
+                      onConfirm={() => deleteRule(rule.id)}
                       className="text-xs text-muted-foreground hover:text-destructive"
                     >
                       Eliminar
-                    </button>
+                    </ConfirmButton>
                   </div>
                 </div>
               )}
@@ -919,7 +930,7 @@ export default function SettingsPage() {
                   </div>
                   <div className="flex gap-3">
                     <button onClick={() => setEditingBreakId(rule.id)} className="text-xs text-muted-foreground hover:text-foreground">Editar</button>
-                    <button onClick={() => deleteBreakRule(rule.id)} className="text-xs text-muted-foreground hover:text-destructive">Eliminar</button>
+                    <ConfirmButton onConfirm={() => deleteBreakRule(rule.id)} className="text-xs text-muted-foreground hover:text-destructive">Eliminar</ConfirmButton>
                   </div>
                 </div>
               )}

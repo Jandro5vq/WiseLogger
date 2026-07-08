@@ -1,10 +1,11 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { isoToLocalInput } from '@/lib/utils'
 import { DateTimeInput } from '@/components/ui/date-time-input'
 import { useToast } from '@/components/ui/toast'
+import { Play } from 'pixelarticons/react'
 
 interface Favorite {
   description: string
@@ -15,11 +16,13 @@ interface Favorite {
 interface NewTaskFormProps {
   entryId: string
   activeTaskId?: string // if set, it will be stopped first
+  /** Description of the active task — hides its quick-start chip while it runs */
+  activeTaskDescription?: string
   /** ISO string — if provided, the new-task form opens with this as the default start time */
   defaultStartTime?: string
 }
 
-export function NewTaskForm({ entryId, activeTaskId, defaultStartTime }: NewTaskFormProps) {
+export function NewTaskForm({ entryId, activeTaskId, activeTaskDescription, defaultStartTime }: NewTaskFormProps) {
   const router = useRouter()
   const toast = useToast()
   const [open, setOpen] = useState(false)
@@ -30,24 +33,54 @@ export function NewTaskForm({ entryId, activeTaskId, defaultStartTime }: NewTask
   const [favorites, setFavorites] = useState<Favorite[]>([])
   const [showFavorites, setShowFavorites] = useState(false)
   const [loading, setLoading] = useState(false)
+  const [quickStarting, setQuickStarting] = useState('')
   const [error, setError] = useState('')
 
-  useEffect(() => {
+  // Recent task names, newest first (the API orders by max(startTime) desc).
+  // Refetched every time the form opens so the list never goes stale.
+  const loadFavorites = useCallback(() => {
     fetch('/api/tasks/favorites')
       .then((r) => (r.ok ? r.json() : []))
       .then((d) => setFavorites(Array.isArray(d) ? d : []))
       .catch(() => {})
   }, [])
 
+  useEffect(() => { loadFavorites() }, [loadFavorites])
+
   useEffect(() => {
-    function handleOpen() { setOpen(true) }
+    function handleOpen() {
+      loadFavorites()
+      setOpen(true)
+    }
     window.addEventListener('wl:new-task', handleOpen)
     return () => window.removeEventListener('wl:new-task', handleOpen)
-  }, [])
+  }, [loadFavorites])
 
   function openForm() {
+    loadFavorites()
     setStartTime(isoToLocalInput(defaultStartTime ?? new Date().toISOString()))
     setOpen(true)
+  }
+
+  // One-tap start: stop the active task (if any) at now and start the favorite,
+  // same sequence as the resume action in the task list.
+  async function quickStart(fav: Favorite) {
+    setQuickStarting(fav.description)
+    if (activeTaskId) {
+      await fetch(`/api/tasks/${activeTaskId}/stop`, { method: 'POST' })
+    }
+    const res = await fetch(`/api/entries/${entryId}/tasks`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description: fav.description, tags: fav.tags }),
+    })
+    setQuickStarting('')
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      toast.error(data.error || 'No se pudo iniciar la tarea')
+      return
+    }
+    router.refresh()
   }
 
   function applyFavorite(fav: Favorite) {
@@ -102,18 +135,42 @@ export function NewTaskForm({ entryId, activeTaskId, defaultStartTime }: NewTask
     setStartTime('')
     setEndTime('')
     setOpen(false)
+    loadFavorites()
     router.refresh()
   }
 
   if (!open) {
+    const quickChips = favorites
+      .filter((f) => f.description !== activeTaskDescription)
+      .slice(0, 2)
     return (
-      <button
-        data-tour="new-task"
-        onClick={openForm}
-        className="w-full rounded-lg border-2 border-dashed border-border hover:border-primary/50 py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
-      >
-        + Nueva tarea <span className="text-xs opacity-60">(N)</span>
-      </button>
+      <div className="space-y-2">
+        <button
+          data-tour="new-task"
+          onClick={openForm}
+          className="w-full rounded-lg border-2 border-dashed border-border hover:border-primary/50 py-3 text-sm text-muted-foreground hover:text-foreground transition-colors"
+        >
+          + Nueva tarea <span className="text-xs opacity-60">(N)</span>
+        </button>
+        {quickChips.length > 0 && (
+          <div className="flex flex-wrap gap-1.5">
+            {quickChips.map((fav) => (
+              <button
+                key={fav.description}
+                onClick={() => quickStart(fav)}
+                disabled={!!quickStarting}
+                title={`Iniciar «${fav.description}» ahora`}
+                className="flex items-center gap-1 max-w-full rounded-full border border-border bg-card px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors disabled:opacity-50"
+              >
+                <Play width={12} height={12} className="shrink-0" />
+                <span className="truncate">
+                  {quickStarting === fav.description ? 'Iniciando…' : fav.description}
+                </span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     )
   }
 

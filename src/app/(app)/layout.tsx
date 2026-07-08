@@ -3,6 +3,7 @@ import { getSession } from '@/lib/auth/session'
 import { Sidebar } from '@/components/layout/sidebar'
 import { ThemeToggle } from '@/components/layout/theme-toggle'
 import { KeyboardShortcuts } from '@/components/layout/keyboard-shortcuts'
+import { LiveRefresh } from '@/components/layout/live-refresh'
 import { OnboardingProvider } from '@/components/onboarding/onboarding-provider'
 import { Toaster } from '@/components/ui/toast'
 
@@ -26,6 +27,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           </main>
         </div>
         <KeyboardShortcuts />
+        <LiveRefresh />
         <OnboardingProvider
           userId={session.user.id}
           username={session.user.username}

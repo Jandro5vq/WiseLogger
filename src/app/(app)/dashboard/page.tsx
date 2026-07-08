@@ -129,6 +129,7 @@ export default async function DashboardPage() {
             <NewTaskForm
               entryId={entry.id}
               activeTaskId={activeTask?.id}
+              activeTaskDescription={activeTask?.description}
               defaultStartTime={newTaskDefaultStart}
             />
           )}
