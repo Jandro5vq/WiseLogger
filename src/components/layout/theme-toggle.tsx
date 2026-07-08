@@ -16,12 +16,14 @@ export function ThemeToggle() {
   const current = (theme ?? 'system') as 'light' | 'dark' | 'system'
   const next = themes[(themes.indexOf(current) + 1) % themes.length]
   const Icon = Icons[current]
+  const labels = { light: 'claro', dark: 'oscuro', system: 'sistema' }
 
   return (
     <button
       onClick={() => setTheme(next)}
       className="rounded-md p-2 text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
-      title={`Theme: ${current}`}
+      title={`Tema: ${labels[current]}`}
+      aria-label={`Cambiar tema (actual: ${labels[current]})`}
     >
       <Icon width={20} height={20} />
     </button>
