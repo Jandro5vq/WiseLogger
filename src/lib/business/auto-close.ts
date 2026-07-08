@@ -24,15 +24,28 @@ export function autoCloseEntry(entry: Entry): void {
   }
 
   const breakIntervals = getEntryBreaks(entry.id).map((b) => breakToInterval(b, entry.date))
-  const totalBreakMs = breakIntervals.reduce(
-    (sum, b) => sum + (new Date(b.endIso).getTime() - new Date(b.startIso).getTime()),
-    0
-  )
 
-  // Wall-clock end of a full day: start, plus the expected net work, plus every break
-  // taken during the day.
+  // Wall-clock end of a full day: the instant by which the non-break time since the
+  // first task's start adds up to the expected net work. Only break time that falls
+  // after the first start counts — a break entirely before the first task must not
+  // push the end later (carving would subtract nothing, inflating net worked time).
   const firstStartMs = new Date(tasks[0].startTime).getTime()
-  const expectedEndMs = firstStartMs + entry.expectedMinutes * 60_000 + totalBreakMs
+  let remainingWorkMs = entry.expectedMinutes * 60_000
+  let expectedEndMs = firstStartMs
+  const sortedBreaks = breakIntervals
+    .map((b) => ({ start: new Date(b.startIso).getTime(), end: new Date(b.endIso).getTime() }))
+    .filter((b) => b.end > firstStartMs)
+    .sort((a, b) => a.start - b.start)
+  for (const b of sortedBreaks) {
+    if (b.start > expectedEndMs) {
+      const gapMs = b.start - expectedEndMs
+      if (gapMs >= remainingWorkMs) break
+      remainingWorkMs -= gapMs
+      expectedEndMs = b.start
+    }
+    expectedEndMs = Math.max(expectedEndMs, b.end)
+  }
+  expectedEndMs += remainingWorkMs
 
   const lastTask = tasks[tasks.length - 1] // tasks are ordered by startTime
   const lastStartMs = new Date(lastTask.startTime).getTime()

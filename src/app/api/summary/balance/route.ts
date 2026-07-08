@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   const params = new URL(req.url).searchParams
   const upToDate = params.get('upTo') ?? undefined
   const fromDate = params.get('from') ?? undefined
-  const result = computeBalance(session.user.id, upToDate, fromDate)
+  const result = computeBalance(session.user.id, upToDate, fromDate, session.user.timezone)
   return NextResponse.json(result, {
     headers: { 'Cache-Control': 'private, max-age=60' },
   })

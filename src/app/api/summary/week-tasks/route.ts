@@ -8,14 +8,15 @@ import { listTasksForEntries } from '@/lib/db/queries/tasks'
 import { getBreaksForEntries } from '@/lib/db/queries/entry-breaks'
 import { breakToInterval } from '@/lib/business/breaks'
 import { sumWorkedMinutes } from '@/lib/business/break-math'
-import { getWeekBounds, addDateStr } from '@/lib/tz'
+import { getWeekBounds, addDateStr, dateStringInTz } from '@/lib/tz'
 import { parseTaskTags } from '@/types/db'
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const date = new URL(req.url).searchParams.get('date') ?? new Date().toISOString().split('T')[0]
+  // Default to today in the user's timezone — the UTC date can be a day off.
+  const date = new URL(req.url).searchParams.get('date') ?? dateStringInTz(new Date(), session.user.timezone)
   const { from, to } = getWeekBounds(date)
 
   // Build date range for the week

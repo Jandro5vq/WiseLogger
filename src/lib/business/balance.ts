@@ -3,6 +3,7 @@ import { listTasksForEntry, listTasksForEntries } from '@/lib/db/queries/tasks'
 import { getEntryBreaks, getBreaksForEntries } from '@/lib/db/queries/entry-breaks'
 import { breakToInterval } from '@/lib/business/breaks'
 import { sumWorkedMinutes } from '@/lib/business/break-math'
+import { dateStringInTz } from '@/lib/tz'
 
 export interface DaySummary {
   date: string
@@ -20,11 +21,18 @@ export interface BalanceResult {
 
 /**
  * Computes balance for a user within [fromDate, upToDate] (both inclusive).
- * If fromDate is omitted, reads from the start of history.
+ * If fromDate is omitted, reads from the start of history. If upToDate is
+ * omitted, it defaults to today *in the given timezone* — the UTC calendar
+ * date would drop the current day for users ahead of UTC.
  * Always reads from DB — never cached.
  */
-export function computeBalance(userId: string, upToDate?: string, fromDate?: string): BalanceResult {
-  const to = upToDate ?? new Date().toISOString().split('T')[0]
+export function computeBalance(
+  userId: string,
+  upToDate?: string,
+  fromDate?: string,
+  timezone = 'UTC'
+): BalanceResult {
+  const to = upToDate ?? dateStringInTz(new Date(), timezone)
   const allEntries = listEntries(userId, fromDate, to)
   const entryIds = allEntries.map((e) => e.id)
 

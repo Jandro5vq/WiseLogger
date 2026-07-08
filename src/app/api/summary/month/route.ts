@@ -4,15 +4,17 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { computeBalance } from '@/lib/business/balance'
+import { dateStringInTz } from '@/lib/tz'
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const now = new Date()
+  // Default year/month from today in the user's timezone, not the server clock.
+  const todayStr = dateStringInTz(new Date(), session.user.timezone)
   const sp = new URL(req.url).searchParams
-  const year = parseInt(sp.get('year') ?? String(now.getFullYear()), 10)
-  const month = parseInt(sp.get('month') ?? String(now.getMonth() + 1), 10)
+  const year = parseInt(sp.get('year') ?? todayStr.slice(0, 4), 10)
+  const month = parseInt(sp.get('month') ?? todayStr.slice(5, 7), 10)
 
   const from = `${year}-${String(month).padStart(2, '0')}-01`
   const lastDay = new Date(year, month, 0).getDate()

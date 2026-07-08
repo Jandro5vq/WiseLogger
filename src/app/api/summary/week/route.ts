@@ -4,13 +4,14 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { computeBalance } from '@/lib/business/balance'
-import { getWeekBounds } from '@/lib/tz'
+import { getWeekBounds, dateStringInTz } from '@/lib/tz'
 
 export async function GET(req: NextRequest) {
   const session = await getSession(req)
   if (!session) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const date = new URL(req.url).searchParams.get('date') ?? new Date().toISOString().split('T')[0]
+  // Default to today in the user's timezone — the UTC date can be a day off.
+  const date = new URL(req.url).searchParams.get('date') ?? dateStringInTz(new Date(), session.user.timezone)
   const { from, to } = getWeekBounds(date)
   const result = computeBalance(session.user.id, to)
   const weekDays = result.days.filter((d) => d.date >= from && d.date <= to)
