@@ -6,7 +6,7 @@ import { v4 as uuidv4 } from 'uuid'
 import { getSession } from '@/lib/auth/session'
 import { getEntryById } from '@/lib/db/queries/entries'
 import { getEntryBreaks, createEntryBreak } from '@/lib/db/queries/entry-breaks'
-import { breakToInterval, detectOverlap, CreateBreakSchema } from '@/lib/business/breaks'
+import { breakToInterval, detectOverlap, toBreakStartIso, CreateBreakSchema } from '@/lib/business/breaks'
 import { splitTasksAroundBreak, mergeContiguousSpans } from '@/lib/business/spans'
 import { parseBody } from '@/lib/api'
 
@@ -33,7 +33,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const parsed = parseBody(CreateBreakSchema, await req.json())
   if (!parsed.ok) return parsed.response
-  const { breakStart, durationMinutes, label } = parsed.data
+  const { breakStart: rawBreakStart, durationMinutes, label } = parsed.data
+
+  // Persist an absolute ISO instant so read-time interpretation never depends on
+  // the server's timezone (legacy 'HH:MM' input resolves in the user's timezone).
+  const breakStart = toBreakStartIso(rawBreakStart, entry.date, session.user.timezone)
 
   const { startIso, endIso } = breakToInterval({ breakStart, durationMinutes }, entry.date)
 

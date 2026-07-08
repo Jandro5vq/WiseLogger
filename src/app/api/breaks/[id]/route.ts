@@ -5,7 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { getEntryBreakById, updateEntryBreak, deleteEntryBreak } from '@/lib/db/queries/entry-breaks'
 import { getEntryById } from '@/lib/db/queries/entries'
-import { buildEntryIntervals, detectOverlap, breakToInterval, UpdateBreakSchema } from '@/lib/business/breaks'
+import { buildEntryIntervals, detectOverlap, breakToInterval, toBreakStartIso, UpdateBreakSchema } from '@/lib/business/breaks'
 import { extendPreviousTaskOnBreakDelete, splitTasksAroundBreak, mergeContiguousSpans } from '@/lib/business/spans'
 import { parseBody } from '@/lib/api'
 
@@ -20,19 +20,23 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const parsed = parseBody(UpdateBreakSchema, await req.json())
   if (!parsed.ok) return parsed.response
-  const newBreakStart = parsed.data.breakStart ?? b.breakStart
+
+  const entry = getEntryById(b.entryId)
+  if (!entry) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+  // Persist an absolute ISO instant so read-time interpretation never depends on
+  // the server's timezone (legacy 'HH:MM' input resolves in the user's timezone).
+  const newBreakStart = parsed.data.breakStart !== undefined
+    ? toBreakStartIso(parsed.data.breakStart, entry.date, session.user.timezone)
+    : b.breakStart
   const newDuration = parsed.data.durationMinutes ?? b.durationMinutes
 
   // Whitelist the columns a client may change — never write the raw body, which
   // could otherwise reassign userId/entryId/fromRuleId.
   const updates: Record<string, unknown> = {}
-  if (parsed.data.breakStart !== undefined) updates.breakStart = parsed.data.breakStart
+  if (parsed.data.breakStart !== undefined) updates.breakStart = newBreakStart
   if (parsed.data.durationMinutes !== undefined) updates.durationMinutes = parsed.data.durationMinutes
   if (parsed.data.label !== undefined) updates.label = parsed.data.label
-
-  // Validate overlap against other intervals (excluding this break)
-  const entry = getEntryById(b.entryId)
-  if (!entry) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   const { startIso: newStartIso, endIso: newEndIso } = breakToInterval(
     { breakStart: newBreakStart, durationMinutes: newDuration },
