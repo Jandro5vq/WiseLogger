@@ -1,7 +1,8 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useToast } from '@/components/ui/toast'
+import { useAutoRefresh } from '@/lib/use-auto-refresh'
 import { formatMinutes, localDateString } from '@/lib/utils'
 import { getJson } from '@/lib/fetcher'
 import { HoursBarChart } from '@/components/stats/hours-bar-chart'
@@ -62,10 +63,18 @@ export default function StatsPage() {
   const [loadingTopTasks, setLoadingTopTasks] = useState(true)
   const [selectedDate, setSelectedDate] = useState<string | null>(null)
 
+  const refreshTick = useAutoRefresh()
+  const lastPeriodRef = useRef<Period | null>(null)
+  const lastHeatmapRef = useRef<HeatmapPeriod | null>(null)
+
   // Period-dependent: KPIs + hours bar + weekday pattern + top tasks + breakdown
   useEffect(() => {
-    setLoadingData(true)
-    setLoadingTopTasks(true)
+    // Skeletons only when switching period — background refreshes swap in place.
+    if (lastPeriodRef.current !== period) {
+      lastPeriodRef.current = period
+      setLoadingData(true)
+      setLoadingTopTasks(true)
+    }
     const { from, to } = periodBounds(period)
 
     const summaryUrl =
@@ -82,18 +91,22 @@ export default function StatsPage() {
     getJson<{ tasks?: TopTask[] }>(`/api/summary/tasks-agg?from=${from}&to=${to}`)
       .then((d) => { setTopTasks(d.tasks ?? []); setLoadingTopTasks(false) })
       .catch(() => { setLoadingTopTasks(false); toast.error('Error al cargar tareas') })
-  }, [period, toast])
+  }, [period, refreshTick, toast])
 
   // Heatmap + cumulative line: bounded to heatmap period
   useEffect(() => {
-    setLoadingHeatmap(true)
+    if (lastHeatmapRef.current !== heatmapPeriod) {
+      lastHeatmapRef.current = heatmapPeriod
+      setLoadingHeatmap(true)
+    }
     const from = heatmapFromDate(HEATMAP_WEEKS[heatmapPeriod])
     getJson<{ days?: DaySummary[] }>(`/api/summary/balance?from=${from}`)
       .then((d) => { setHeatmapDays(d.days ?? []); setLoadingHeatmap(false) })
       .catch(() => { setLoadingHeatmap(false); toast.error('Error al cargar el balance') })
-  }, [heatmapPeriod, toast])
+  }, [heatmapPeriod, refreshTick, toast])
 
   const periodBalance = data ? data.totalWorkedMinutes - data.totalExpectedMinutes : 0
+  const exportBounds = periodBounds(period)
 
   const taskCountByDate = useMemo(() => {
     // DaySummary doesn't carry task counts; left empty for now so the heatmap
@@ -279,19 +292,22 @@ export default function StatsPage() {
         </div>
       )}
 
-      {/* Export */}
+      {/* Export — scoped to the selected period */}
       <div className="rounded-lg border border-border bg-card p-4">
-        <h2 className="text-sm font-medium mb-3">Exportar</h2>
+        <h2 className="text-sm font-medium mb-1">Exportar</h2>
+        <p className="text-xs text-muted-foreground mb-3">
+          {period === 'week' ? 'Semana actual' : period === 'month' ? 'Mes actual' : 'Año actual'} ({exportBounds.from} → {exportBounds.to})
+        </p>
         <div className="flex gap-2">
           <a
-            href="/api/export/csv"
+            href={`/api/export/csv?from=${exportBounds.from}&to=${exportBounds.to}`}
             download
             className="rounded-md border border-border px-4 py-2 text-sm hover:bg-accent transition-colors"
           >
             Descargar CSV
           </a>
           <a
-            href="/api/export/json"
+            href={`/api/export/json?from=${exportBounds.from}&to=${exportBounds.to}`}
             download
             className="rounded-md border border-border px-4 py-2 text-sm hover:bg-accent transition-colors"
           >

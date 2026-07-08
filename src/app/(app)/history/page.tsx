@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { MonthCalendar } from '@/components/history/month-calendar'
 import { WeekView } from '@/components/history/week-view'
 import { getJson } from '@/lib/fetcher'
+import { useAutoRefresh } from '@/lib/use-auto-refresh'
 import type { DaySummary } from '@/lib/business/balance'
 
 type View = 'week' | 'month'
@@ -15,12 +16,14 @@ export default function HistoryPage() {
   const [month, setMonth] = useState(now.getMonth() + 1)
   const [days, setDays] = useState<DaySummary[]>([])
 
+  const refreshTick = useAutoRefresh()
+
   useEffect(() => {
     if (view !== 'month') return
     getJson<{ days?: DaySummary[] }>(`/api/summary/month?year=${year}&month=${month}`)
       .then((data) => setDays(data.days ?? []))
       .catch(() => {})
-  }, [year, month, view])
+  }, [year, month, view, refreshTick])
 
   return (
     <div className="max-w-7xl mx-auto">

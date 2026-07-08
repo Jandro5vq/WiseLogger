@@ -7,8 +7,9 @@ import { formatMinutes, localDateString } from '@/lib/utils'
 import type { TaskWithTags } from '@/types/db'
 import { ArrowLeftBox, ArrowRightBox } from 'pixelarticons/react'
 import { useToast } from '@/components/ui/toast'
-import { taskWorkedMinutes, type BreakInterval } from '@/lib/business/break-math'
+import { taskWorkedMinutes, netTaskMinutes, type BreakInterval } from '@/lib/business/break-math'
 import { getJson } from '@/lib/fetcher'
+import { useAutoRefresh } from '@/lib/use-auto-refresh'
 
 import { loadBilled, saveBilled, billedKey, groupSignature, fetchBilledFromServer, markBilledOnServer, unmarkBilledOnServer, type BilledMap } from '@/lib/billed'
 
@@ -80,23 +81,29 @@ interface TaskGroup {
   sessions: number
   notes: string | null
   signature: string
+  hasActive: boolean
 }
 
 function groupTasks(tasks: TaskWithTags[], breaks: BreakInterval[]): TaskGroup[] {
-  const map = new Map<string, { tags: string[]; totalMinutes: number; sessions: number; notes: string | null; tasks: TaskWithTags[] }>()
+  const map = new Map<string, { tags: string[]; totalMinutes: number; sessions: number; notes: string | null; tasks: TaskWithTags[]; hasActive: boolean }>()
+  const nowIso = new Date().toISOString()
   for (const t of tasks) {
-    if (!t.endTime) continue
-    // Net worked minutes (rounded per segment) so per-task totals sum to the day's worked total
-    const minutes = taskWorkedMinutes(t.startTime, t.endTime, breaks)
+    // Completed: net worked minutes (rounded per segment) so per-task totals sum to
+    // the day's worked total. Active: minutes elapsed so far, marked "en curso".
+    const minutes = t.endTime
+      ? taskWorkedMinutes(t.startTime, t.endTime, breaks)
+      : Math.max(0, Math.round(netTaskMinutes(t.startTime, nowIso, breaks)))
+    const isActive = !t.endTime
     const existing = map.get(t.description)
     if (existing) {
       existing.totalMinutes += minutes
       existing.sessions++
       existing.tasks.push(t)
+      existing.hasActive = existing.hasActive || isActive
       // Keep latest non-null notes
       if (t.notes) existing.notes = t.notes
     } else {
-      map.set(t.description, { tags: t.tags, totalMinutes: minutes, sessions: 1, notes: t.notes, tasks: [t] })
+      map.set(t.description, { tags: t.tags, totalMinutes: minutes, sessions: 1, notes: t.notes, tasks: [t], hasActive: isActive })
     }
   }
   return Array.from(map.entries()).map(([description, v]) => ({
@@ -105,7 +112,10 @@ function groupTasks(tasks: TaskWithTags[], breaks: BreakInterval[]): TaskGroup[]
     totalMinutes: v.totalMinutes,
     sessions: v.sessions,
     notes: v.notes,
-    signature: groupSignature(v.tasks),
+    // Signature covers completed segments only, so a running task doesn't
+    // churn the billed-group signature (it would flip again on stop).
+    signature: groupSignature(v.tasks.filter((t) => t.endTime)),
+    hasActive: v.hasActive,
   }))
 }
 
@@ -180,6 +190,12 @@ function DayCard({ day, index, billed, onToggleBilled }: {
                     className="h-3 w-3 rounded border-muted-foreground/40 accent-primary shrink-0 cursor-pointer"
                   />
                   <span className={`text-xs font-medium truncate ${isBilled ? 'line-through' : ''}`} title={g.description}>{g.description}</span>
+                  {g.hasActive && (
+                    <span className="flex items-center gap-1 shrink-0 text-[10px] text-green-600 dark:text-green-400 font-medium">
+                      <span className="animate-pulse w-1.5 h-1.5 rounded-full bg-green-500" />
+                      en curso
+                    </span>
+                  )}
                   <CopyButton text={g.notes ?? g.description} title={g.notes ? 'Copiar notas' : 'Copiar descripción'} />
                   {g.sessions > 1 && (
                     <span className="text-[10px] text-muted-foreground shrink-0">×{g.sessions}</span>
@@ -269,8 +285,16 @@ export function WeekView() {
     }
   }, [toast])
 
+  const refreshTick = useAutoRefresh()
+  const lastAnchorRef = useRef<string | null>(null)
+
   useEffect(() => {
-    setLoading(true)
+    // Show the loading state only when navigating to a different week —
+    // background refreshes (focus/interval) swap the data in without a flash.
+    if (lastAnchorRef.current !== anchorDate) {
+      lastAnchorRef.current = anchorDate
+      setLoading(true)
+    }
     getJson<WeekData>(`/api/summary/week-tasks?date=${anchorDate}`)
       .then((d) => {
         setData(d)
@@ -303,7 +327,7 @@ export function WeekView() {
         }
       })
       .catch(() => { setLoading(false); toast.error('Error al cargar la semana') })
-  }, [anchorDate, toast])
+  }, [anchorDate, refreshTick, toast])
 
   function navigate(n: number) {
     setAnchorDate((prev) => {
