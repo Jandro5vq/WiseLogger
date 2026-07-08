@@ -6,6 +6,8 @@ import { getEntryBreakById, createEntryBreak, updateEntryBreak, deleteEntryBreak
 import { autoCreateEntry, todayDateString } from '@/lib/business/tasks'
 import { getUserById } from '@/lib/db/queries/users'
 import { computeBalance, computeEntryWorkedMinutes } from '@/lib/business/balance'
+import { stopTask } from '@/lib/business/stop'
+import { splitTaskAcrossMidnights, splitEntryTasksAcrossMidnights, mergeContiguousSpans } from '@/lib/business/spans'
 import { buildEntryIntervals, detectOverlap, breakToInterval, toBreakStartIso } from '@/lib/business/breaks'
 import { parseTaskTags } from '@/types/db'
 import { formatMinutes } from '@/lib/utils'
@@ -111,8 +113,10 @@ export const mcpTools: McpTool[] = [
       if (entry.endTime) return { error: 'La jornada ya está cerrada', date: targetDate }
 
       const closeTime = end_time ?? new Date().toISOString()
+      const tz = getUserById(userId)?.timezone ?? 'UTC'
       for (const t of listTasksForEntry(entry.id).filter((t) => !t.endTime)) {
-        updateTask(t.id, { endTime: closeTime })
+        const result = stopTask(t.id, userId, tz, closeTime)
+        if (!result.ok) return { error: result.error }
       }
       const updated = updateEntry(entry.id, { endTime: closeTime })
       return { message: 'Jornada cerrada', date: targetDate, endTime: updated?.endTime }
@@ -171,7 +175,14 @@ export const mcpTools: McpTool[] = [
         tags: JSON.stringify(tags ?? []),
       })
 
-      return parseTaskTags(task)
+      // Keep the day-split invariant: a historical task that crosses local
+      // midnight gets one segment per calendar day (no-op otherwise).
+      if (end_time) {
+        const tz = getUserById(userId)?.timezone ?? 'UTC'
+        splitTaskAcrossMidnights(task.id, userId, tz)
+      }
+
+      return parseTaskTags(getTaskById(task.id) ?? task)
     },
   },
 
@@ -186,8 +197,10 @@ export const mcpTools: McpTool[] = [
       const active = getActiveTask(userId)
       if (!active) return { error: 'No hay tarea activa' }
 
-      const updated = updateTask(active.id, { endTime: end_time ?? new Date().toISOString() })
-      return parseTaskTags(updated!)
+      const tz = getUserById(userId)?.timezone ?? 'UTC'
+      const result = stopTask(active.id, userId, tz, end_time)
+      if (!result.ok) return { error: result.error }
+      return parseTaskTags(result.task)
     },
   },
 
@@ -236,8 +249,13 @@ export const mcpTools: McpTool[] = [
       if (start_time !== undefined) updates.startTime = start_time
       if (end_time !== undefined) updates.endTime = end_time
 
-      const updated = updateTask(task_id, updates)
-      return parseTaskTags(updated!)
+      updateTask(task_id, updates)
+      // Same post-write pipeline as the HTTP PATCH: split any segment the edit
+      // pushed across a local midnight, then fuse touching same-task spans.
+      const tz = getUserById(userId)?.timezone ?? 'UTC'
+      splitEntryTasksAcrossMidnights(task.entryId, userId, tz)
+      mergeContiguousSpans(task.entryId)
+      return parseTaskTags(getTaskById(task_id)!)
     },
   },
 

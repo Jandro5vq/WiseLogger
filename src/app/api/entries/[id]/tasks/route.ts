@@ -137,11 +137,24 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
   }
 
+  // A new active task closes the current one at its own start. Reject a backdated
+  // start at/before the active task's start — closing there would persist an
+  // inverted (endTime <= startTime) row.
+  if (!endTime) {
+    const active = getActiveTask(session.user.id)
+    if (active && tStart <= new Date(active.startTime).getTime()) {
+      return NextResponse.json(
+        { error: 'La hora de fin debe ser posterior a la de inicio' },
+        { status: 400 }
+      )
+    }
+  }
+
   // Atomic: stop active task + create new one in a transaction to prevent races
   const task = sqlite.transaction(() => {
     if (!endTime) {
       const active = getActiveTask(session.user.id)
-      if (active) {
+      if (active && tStart > new Date(active.startTime).getTime()) {
         updateTask(active.id, { endTime: effectiveStart })
       }
     }
