@@ -63,6 +63,7 @@ export function splitTasksAroundBreak(
         endTime: task.endTime,
         description: task.description,
         tags: task.tags,
+        notes: task.notes ?? undefined,
       })
       createdTaskIds.push(newTask.id)
     }
@@ -102,13 +103,13 @@ export function autoSplitActiveTask(
   if (relevantBreaks.length === 0) return false
 
   for (const { startIso, endIso } of relevantBreaks) {
-    const { description, tags } = current! // capture before stopping
+    const { description, tags, notes } = current! // capture before stopping
     updateTask(current!.id, { endTime: startIso })
     current = undefined
 
     if (new Date(endIso).getTime() <= now) {
       // Break has already ended → resume with a new active task
-      current = createTask({ id: uuidv4(), entryId, userId, startTime: endIso, description, tags })
+      current = createTask({ id: uuidv4(), entryId, userId, startTime: endIso, description, tags, notes: notes ?? undefined })
     } else {
       break // break is still ongoing, no new active task yet
     }
@@ -193,7 +194,10 @@ export function extendPreviousTaskOnBreakDelete(
     (t) => t.id !== prevTask!.id && new Date(t.startTime).getTime() === limit
   )
   if (nextTask && nextTask.description === prevTask.description) {
-    updateTask(prevTask.id, { endTime: nextTask.endTime })
+    updateTask(prevTask.id, {
+      endTime: nextTask.endTime,
+      notes: coalesceNotes(prevTask.notes, nextTask.notes),
+    })
     deleteTask(nextTask.id)
   }
 }
@@ -342,18 +346,30 @@ export function splitEntryTasksAcrossMidnights(entryId: string, userId: string, 
 }
 
 /**
+ * Combines the notes of two spans being fused into one. Keeps whichever side has
+ * notes; if both do and they differ, joins them so neither is silently lost.
+ */
+function coalesceNotes(a: string | null, b: string | null): string | null {
+  if (!a) return b ?? null
+  if (!b || a === b) return a
+  return `${a}\n${b}`
+}
+
+/**
  * Fuses spans of the same task that are exactly contiguous (endTime of one === startTime of next).
  * Called after any operation that may leave adjacent same-description spans touching.
+ * Spans only merge when their tags match too, so differing tag sets are never collapsed.
  */
 export function mergeContiguousSpans(entryId: string): void {
   const tasks = listTasksForEntry(entryId)
   const completed = tasks.filter((t) => t.endTime)
 
-  // Group by description
+  // Group by description + tags (raw JSON string) so tag differences block merging
   const groups = new Map<string, typeof completed>()
   for (const t of completed) {
-    if (!groups.has(t.description)) groups.set(t.description, [])
-    groups.get(t.description)!.push(t)
+    const key = `${t.description} ${t.tags}`
+    if (!groups.has(key)) groups.set(key, [])
+    groups.get(key)!.push(t)
   }
 
   for (const spans of Array.from(groups.values())) {
@@ -365,7 +381,10 @@ export function mergeContiguousSpans(entryId: string): void {
       const curr = spans[i]
       const next = spans[i + 1]
       if (new Date(curr.endTime!).getTime() === new Date(next.startTime).getTime()) {
-        updateTask(curr.id, { endTime: next.endTime })
+        const notes = coalesceNotes(curr.notes, next.notes)
+        updateTask(curr.id, { endTime: next.endTime, notes })
+        curr.endTime = next.endTime
+        curr.notes = notes
         deleteTask(next.id)
         spans.splice(i + 1, 1)
       } else {
