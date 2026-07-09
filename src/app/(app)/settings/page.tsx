@@ -6,7 +6,15 @@ import { formatMinutes } from '@/lib/utils'
 import { TimeInput } from '@/components/ui/time-input'
 import { ConfirmButton } from '@/components/ui/confirm-button'
 import { useToast } from '@/components/ui/toast'
-import { ACCENTS, readStoredAccent, setStoredAccent, type AccentId } from '@/components/layout/accent-provider'
+import {
+  ACCENTS,
+  checkAccentContrast,
+  readStoredAccent,
+  readStoredCustomHex,
+  setStoredAccent,
+  setStoredCustomAccent,
+  type AccentId,
+} from '@/components/layout/accent-provider'
 
 // ─── Break rules ─────────────────────────────────────────────────────────────
 
@@ -612,39 +620,116 @@ function WeekendToggle() {
   )
 }
 
+function PipetteIcon() {
+  return (
+    <svg
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth={2}
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className="h-3 w-3"
+    >
+      <path d="m2 22 1-1h3l9-9" />
+      <path d="M3 21v-3l9-9" />
+      <path d="m15 6 3.4-3.4a2.1 2.1 0 1 1 3 3L18 9l.4.4a2.1 2.1 0 1 1-3 3l-3.8-3.8a2.1 2.1 0 1 1 3-3l.4.4Z" />
+    </svg>
+  )
+}
+
 function AccentPicker() {
   const [accent, setAccent] = useState<AccentId>('blue')
-  useEffect(() => { setAccent(readStoredAccent()) }, [])
+  const [customHex, setCustomHex] = useState('#3b82f6')
+  useEffect(() => {
+    setAccent(readStoredAccent())
+    setCustomHex(readStoredCustomHex())
+  }, [])
 
   function choose(id: AccentId) {
     setAccent(id)
     setStoredAccent(id)
   }
 
+  function chooseCustom(hex: string) {
+    setAccent('custom')
+    setCustomHex(hex)
+    setStoredCustomAccent(hex)
+  }
+
+  const contrast = accent === 'custom' ? checkAccentContrast(customHex) : null
+  const contrastIssue = contrast && (contrast.failsLight || contrast.failsDark)
+
   return (
-    <div className="flex items-center justify-between gap-4">
-      <div>
-        <p className="text-sm font-medium">Color de acento</p>
-        <p className="text-xs text-muted-foreground mt-0.5">
-          Afecta a botones principales, enlaces y estados activos
-        </p>
-      </div>
-      <div className="flex items-center gap-2 flex-wrap justify-end">
-        {ACCENTS.map((a) => (
-          <button
-            key={a.id}
-            type="button"
-            onClick={() => choose(a.id)}
-            title={a.label}
-            aria-label={`Usar acento ${a.label}`}
-            aria-pressed={accent === a.id}
-            className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${
-              accent === a.id ? 'border-foreground scale-110' : 'border-transparent'
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium">Color de acento</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Afecta a botones principales, enlaces y estados activos
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {ACCENTS.map((a) => (
+            <button
+              key={a.id}
+              type="button"
+              onClick={() => choose(a.id)}
+              title={a.label}
+              aria-label={`Usar acento ${a.label}`}
+              aria-pressed={accent === a.id}
+              className={`h-6 w-6 rounded-full border-2 transition-transform hover:scale-110 ${
+                accent === a.id ? 'border-foreground scale-110' : 'border-transparent'
+              }`}
+              style={{ backgroundColor: a.hex }}
+            />
+          ))}
+          <div className="h-6 w-px bg-border mx-1" aria-hidden="true" />
+          <label
+            title="Color personalizado"
+            aria-label="Elegir color de acento personalizado"
+            className={`relative h-7 w-7 rounded-full border-2 transition-transform hover:scale-110 cursor-pointer overflow-hidden shadow-sm ${
+              accent === 'custom' ? 'border-foreground scale-110' : 'border-border'
             }`}
-            style={{ backgroundColor: a.hex }}
-          />
-        ))}
+            style={
+              accent === 'custom'
+                ? { backgroundColor: customHex }
+                : {
+                    background:
+                      'conic-gradient(from 0deg, #ef4444, #f97316, #eab308, #22c55e, #14b8a6, #3b82f6, #a855f7, #ec4899, #ef4444)',
+                  }
+            }
+          >
+            <span
+              className="absolute inset-0 flex items-center justify-center pointer-events-none"
+              aria-hidden="true"
+            >
+              <span className="flex items-center justify-center h-4 w-4 rounded-full bg-white/85 text-black shadow-sm">
+                <PipetteIcon />
+              </span>
+            </span>
+            <input
+              type="color"
+              value={customHex}
+              onChange={(e) => chooseCustom(e.target.value)}
+              aria-label="Selector de color personalizado"
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            />
+          </label>
+        </div>
       </div>
+      {contrastIssue && contrast && (
+        <div className="rounded-lg border border-amber-500/40 bg-amber-500/5 px-3 py-2 text-xs text-amber-600 dark:text-amber-400">
+          Este color tiene poco contraste con el texto de los botones
+          {contrast.failsLight && contrast.failsDark
+            ? ` en modo claro (${contrast.ratioLight.toFixed(1)}:1) y en modo oscuro (${contrast.ratioDark.toFixed(1)}:1)`
+            : contrast.failsLight
+              ? ` en modo claro (${contrast.ratioLight.toFixed(1)}:1)`
+              : ` en modo oscuro (${contrast.ratioDark.toFixed(1)}:1)`}
+          , por debajo del mínimo recomendado (3:1). Esto es solo informativo, no impide
+          usar el color elegido.
+        </div>
+      )}
     </div>
   )
 }
