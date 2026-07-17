@@ -14,6 +14,16 @@ import { splitAtMidnights } from '@/lib/tz'
  *   - Task trimmed at its end        → update endTime = breakStart
  *   - Task trimmed at its start      → update startTime = breakEnd
  *   - Task wraps around break        → trim end + create second span
+ *
+ * The active task (endTime IS NULL) is carved the same way, using its elapsed
+ * span [startTime, now] as its effective interval:
+ *   - Entirely inside the break                  → delete
+ *   - Elapsed time runs into the break            → close it at breakStart
+ *     (nothing resumes automatically — the dashboard's autoSplitActiveTask
+ *     picks it back up once the break itself has ended)
+ *   - Break covers its start, task outlived it     → resume from breakEnd
+ *   - Break falls entirely inside the elapsed span → close at breakStart,
+ *     immediately resume a new active task from breakEnd (break is already over)
  */
 export function splitTasksAroundBreak(
   entryId: string,
@@ -31,7 +41,42 @@ export function splitTasksAroundBreak(
   const deletedDescriptions: string[] = []
 
   for (const task of tasks) {
-    if (!task.endTime) continue // skip active task
+    if (!task.endTime) {
+      const taskStart = new Date(task.startTime).getTime()
+      const effectiveEnd = Math.max(taskStart, Date.now())
+      if (effectiveEnd <= breakStart || taskStart >= breakEnd) continue // no overlap
+
+      if (taskStart >= breakStart && effectiveEnd <= breakEnd) {
+        // Entire elapsed span inside the break → delete
+        deletedDescriptions.push(task.description)
+        deleteTask(task.id)
+        deletedTaskIds.push(task.id)
+      } else if (taskStart < breakStart && effectiveEnd <= breakEnd) {
+        // Elapsed time runs into the break → close it there
+        updateTask(task.id, { endTime: breakStartIso })
+        updatedTaskIds.push(task.id)
+      } else if (taskStart >= breakStart && effectiveEnd > breakEnd) {
+        // Break covers its start; task outlived the break → resume from breakEnd
+        updateTask(task.id, { startTime: breakEndIso })
+        updatedTaskIds.push(task.id)
+      } else {
+        // Break falls inside the elapsed span, already over → close at breakStart,
+        // resume a new active task from breakEnd
+        updateTask(task.id, { endTime: breakStartIso })
+        updatedTaskIds.push(task.id)
+        const resumed = createTask({
+          id: uuidv4(),
+          entryId,
+          userId,
+          startTime: breakEndIso,
+          description: task.description,
+          tags: task.tags,
+          notes: task.notes ?? undefined,
+        })
+        createdTaskIds.push(resumed.id)
+      }
+      continue
+    }
     const taskStart = new Date(task.startTime).getTime()
     const taskEnd = new Date(task.endTime).getTime()
 
@@ -124,7 +169,10 @@ export function autoSplitActiveTask(
  *
  * Returns true if a preceding task was adjusted, false if nothing changed.
  * Does NOT touch breaks — the caller should check for a preceding break
- * separately and reject if one is found.
+ * separately and reject if one is found. Does NOT touch the active task either —
+ * closing it needs an obstacle-aware clamp (see `stopTask`) or, when the caller
+ * already has a full [start, end) span to carve with, `adjustAdjacentTasksForEdit`
+ * — both handle it correctly; a raw `updateTask(..., { endTime })` here would not.
  */
 export function adjustPrecedingTask(entryId: string, newStartIso: string): boolean {
   const newStart = new Date(newStartIso).getTime()
@@ -136,13 +184,6 @@ export function adjustPrecedingTask(entryId: string, newStartIso: string): boole
   })
   if (precedingTask) {
     updateTask(precedingTask.id, { endTime: newStartIso })
-    return true
-  }
-
-  // Also close an active task that started before the new span's start
-  const activeTask = tasks.find((t) => !t.endTime && new Date(t.startTime).getTime() < newStart)
-  if (activeTask) {
-    updateTask(activeTask.id, { endTime: newStartIso })
     return true
   }
 
@@ -240,6 +281,14 @@ export function splitIntervalAroundBreaks(
  *   - A task whose start falls inside the new range → trim its start to newEnd
  *   - A task fully contained inside the new range → deleted
  *
+ * The active task (endTime IS NULL) is treated the same way, using its elapsed
+ * span [startTime, now] as its effective interval:
+ *   - Started before the new range → closed at newStart
+ *   - Started inside the new range and still has elapsed time after newEnd →
+ *     pushed later (startTime = newEnd), stays running
+ *   - Started inside the new range and its whole elapsed span is covered →
+ *     deleted, same as a fully-contained completed task
+ *
  * Does NOT touch the task being edited (excluded by taskId).
  * Returns IDs of affected tasks.
  */
@@ -256,7 +305,30 @@ export function adjustAdjacentTasksForEdit(
   const deletedDescriptions: string[] = []
 
   for (const t of tasks) {
-    if (t.id === taskId || !t.endTime) continue
+    if (t.id === taskId) continue
+
+    if (!t.endTime) {
+      const tStart = new Date(t.startTime).getTime()
+      const effectiveEnd = Math.max(tStart, Date.now())
+      if (effectiveEnd <= newStart || tStart >= newEnd) continue // no overlap
+
+      if (tStart >= newStart) {
+        if (newEnd < effectiveEnd) {
+          // Still has elapsed time after the new range → push its start later
+          updateTask(t.id, { startTime: newEndIso })
+        } else {
+          // Its whole elapsed span is covered by the new range → delete
+          deletedDescriptions.push(t.description)
+          deleteTask(t.id)
+        }
+      } else {
+        // Started before the new range → close it there
+        updateTask(t.id, { endTime: newStartIso })
+      }
+      affectedIds.push(t.id)
+      continue
+    }
+
     const tStart = new Date(t.startTime).getTime()
     const tEnd = new Date(t.endTime).getTime()
     if (tEnd <= newStart || tStart >= newEnd) continue // no overlap

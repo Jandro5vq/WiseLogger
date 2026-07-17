@@ -159,7 +159,7 @@ export const mcpTools: McpTool[] = [
 
       if (end_time) {
         const tEnd = new Date(end_time).getTime()
-        const existing = buildEntryIntervals(entry.id, targetDate)
+        const existing = buildEntryIntervals(entry.id, targetDate, { includeActive: true })
         if (detectOverlap(existing, { start: tStart, end: tEnd })) {
           return { error: 'El intervalo se solapa con una tarea o pausa existente' }
         }
@@ -236,7 +236,7 @@ export const mcpTools: McpTool[] = [
 
         const resolvedEntry = getEntryById(task.entryId)
         if (resolvedEntry) {
-          const existing = buildEntryIntervals(task.entryId, resolvedEntry.date, { excludeTaskId: task.id })
+          const existing = buildEntryIntervals(task.entryId, resolvedEntry.date, { excludeTaskId: task.id, includeActive: true })
           if (detectOverlap(existing, { start: tStart, end: tEnd })) {
             return { error: 'El intervalo se solapa con una tarea o pausa existente' }
           }

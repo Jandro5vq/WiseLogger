@@ -3,10 +3,12 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
-import { getEntryBreakById, updateEntryBreak, deleteEntryBreak } from '@/lib/db/queries/entry-breaks'
+import { getEntryBreakById, updateEntryBreak, deleteEntryBreak, getEntryBreaks } from '@/lib/db/queries/entry-breaks'
 import { getEntryById } from '@/lib/db/queries/entries'
 import { buildEntryIntervals, detectOverlap, breakToInterval, toBreakStartIso, UpdateBreakSchema } from '@/lib/business/breaks'
 import { extendPreviousTaskOnBreakDelete, splitTasksAroundBreak, mergeContiguousSpans } from '@/lib/business/spans'
+import { WriteConflictError, hasInternalOverlap } from '@/lib/business/overlaps'
+import { sqlite } from '@/lib/db'
 import { parseBody } from '@/lib/api'
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
@@ -42,25 +44,48 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     { breakStart: newBreakStart, durationMinutes: newDuration },
     entry.date
   )
-  const existing = buildEntryIntervals(b.entryId, entry.date, { excludeBreakId: b.id })
-  if (detectOverlap(existing, { start: new Date(newStartIso).getTime(), end: new Date(newEndIso).getTime() })) {
-    return NextResponse.json(
-      { error: 'La pausa se solapa con una tarea o pausa existente' },
-      { status: 400 }
-    )
+
+  // Only reject on overlap with ANOTHER break — moving a break onto tasks is
+  // allowed, same as creating one: splitTasksAroundBreak carves them below.
+  const breakOnlyIntervals = getEntryBreaks(b.entryId)
+    .filter((other) => other.id !== b.id)
+    .map((other) => {
+      const { startIso: s, endIso: e } = breakToInterval(other, entry.date)
+      return { start: new Date(s).getTime(), end: new Date(e).getTime() }
+    })
+  if (detectOverlap(breakOnlyIntervals, { start: new Date(newStartIso).getTime(), end: new Date(newEndIso).getTime() })) {
+    return NextResponse.json({ error: 'La pausa se solapa con otra existente' }, { status: 409 })
   }
 
   // Capture old break interval before updating
   const { startIso: oldStart, endIso: oldEnd } = breakToInterval(b, entry.date)
 
-  const updated = updateEntryBreak(params.id, updates)
+  let deletedDescriptions: string[] = []
 
-  // Recompute: undo old break's effect on tasks, then apply new break's position
-  extendPreviousTaskOnBreakDelete(b.entryId, oldStart, oldEnd)
-  const affected = splitTasksAroundBreak(b.entryId, b.userId, newStartIso, newEndIso)
-  mergeContiguousSpans(b.entryId)
+  try {
+    sqlite.transaction(() => {
+      updateEntryBreak(params.id, updates)
 
-  return NextResponse.json({ break: updated, deletedDescriptions: affected.deletedDescriptions })
+      // Recompute: undo old break's effect on tasks, then apply new break's position
+      extendPreviousTaskOnBreakDelete(b.entryId, oldStart, oldEnd)
+      const affected = splitTasksAroundBreak(b.entryId, b.userId, newStartIso, newEndIso)
+      mergeContiguousSpans(b.entryId)
+      deletedDescriptions = affected.deletedDescriptions
+
+      const finalIntervals = buildEntryIntervals(b.entryId, entry.date, { includeActive: true })
+      if (hasInternalOverlap(finalIntervals)) {
+        throw new WriteConflictError('La pausa se solapa con una tarea o pausa existente')
+      }
+    })()
+  } catch (e) {
+    if (e instanceof WriteConflictError) {
+      return NextResponse.json({ error: e.message }, { status: e.status })
+    }
+    throw e
+  }
+
+  const updated = getEntryBreakById(params.id)
+  return NextResponse.json({ break: updated, deletedDescriptions })
 }
 
 export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
@@ -77,11 +102,25 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
   const { startIso, endIso } = breakToInterval(b, entry.date)
 
-  deleteEntryBreak(params.id)
+  try {
+    sqlite.transaction(() => {
+      deleteEntryBreak(params.id)
 
-  // Extend the task immediately before the break to cover the gap, then merge if same description
-  extendPreviousTaskOnBreakDelete(b.entryId, startIso, endIso)
-  mergeContiguousSpans(b.entryId)
+      // Extend the task immediately before the break to cover the gap, then merge if same description
+      extendPreviousTaskOnBreakDelete(b.entryId, startIso, endIso)
+      mergeContiguousSpans(b.entryId)
+
+      const finalIntervals = buildEntryIntervals(b.entryId, entry.date, { includeActive: true })
+      if (hasInternalOverlap(finalIntervals)) {
+        throw new WriteConflictError('No se pudo eliminar la pausa sin dejar un solape')
+      }
+    })()
+  } catch (e) {
+    if (e instanceof WriteConflictError) {
+      return NextResponse.json({ error: e.message }, { status: e.status })
+    }
+    throw e
+  }
 
   return NextResponse.json({ ok: true })
 }

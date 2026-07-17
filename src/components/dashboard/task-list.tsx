@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useState, useEffect, useRef, useTransition } from 'react'
+import { useState, useEffect, useRef, useCallback, useTransition } from 'react'
 import { formatMinutes, isoToLocalInput } from '@/lib/utils'
 import type { TaskWithTags } from '@/types/db'
 import { DateTimeInput } from '@/components/ui/date-time-input'
@@ -139,12 +139,14 @@ function EditTaskForm({ task, onDone, siblingIds }: { task: TaskWithTags; onDone
 
 function AddSpanForm({
   entryId,
+  entryDate,
   description,
   tags,
   notes,
   onDone,
 }: {
   entryId: string
+  entryDate?: string
   description: string
   tags: string[]
   notes: string | null
@@ -153,8 +155,12 @@ function AddSpanForm({
   const router = useRouter()
   const [, startTransition] = useTransition()
   const toast = useToast()
-  const [startTime, setStartTime] = useState('')
-  const [endTime, setEndTime] = useState('')
+  const defaultTime = useCallback(() => {
+    const nowInput = isoToLocalInput(new Date().toISOString())
+    return entryDate ? `${entryDate}T${nowInput.slice(11)}` : nowInput
+  }, [entryDate])
+  const [startTime, setStartTime] = useState(defaultTime)
+  const [endTime, setEndTime] = useState(defaultTime)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -231,6 +237,7 @@ function TaskGroup({
   description,
   segments,
   entryId,
+  entryDate,
   activeTaskId,
   allowResume = true,
   isBilled,
@@ -240,6 +247,7 @@ function TaskGroup({
   description: string
   segments: TaskWithTags[]
   entryId: string
+  entryDate?: string
   activeTaskId?: string
   allowResume?: boolean
   isBilled?: boolean
@@ -423,6 +431,7 @@ function TaskGroup({
         <div className="px-3 pb-3">
           <AddSpanForm
             entryId={entryId}
+            entryDate={entryDate}
             description={description}
             tags={allTags}
             notes={groupNotes}
@@ -623,6 +632,7 @@ export function TaskList({
             description={desc}
             segments={segs}
             entryId={entryId}
+            entryDate={entryDate}
             activeTaskId={activeTaskId}
             allowResume={allowResume}
             isBilled={showBilledCheckbox ? isBilled : undefined}

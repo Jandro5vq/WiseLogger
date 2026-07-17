@@ -73,18 +73,29 @@ export function detectOverlap(existing: Interval[], candidate: Interval): boolea
 /**
  * Build all current intervals for an entry (tasks + breaks), optionally
  * excluding one ID (for edit scenarios).
+ *
+ * `includeActive` opts an active task (endTime IS NULL) into the interval set as
+ * [startTime, now] — off by default so break-path callers keep their existing
+ * behavior (they rely on `splitTasksAroundBreak` / `autoSplitActiveTask` to
+ * reconcile the active task instead of rejecting on it).
  */
 export function buildEntryIntervals(
   entryId: string,
   entryDate: string,
-  options: { excludeTaskId?: string; excludeBreakId?: string } = {}
+  options: { excludeTaskId?: string; excludeBreakId?: string; includeActive?: boolean } = {}
 ): Interval[] {
   const intervals: Interval[] = []
 
   const tasks = listTasksForEntry(entryId)
   for (const t of tasks) {
     if (options.excludeTaskId && t.id === options.excludeTaskId) continue
-    if (!t.endTime) continue
+    if (!t.endTime) {
+      if (options.includeActive) {
+        const start = new Date(t.startTime).getTime()
+        intervals.push({ start, end: Math.max(start, Date.now()) })
+      }
+      continue
+    }
     intervals.push({
       start: new Date(t.startTime).getTime(),
       end: new Date(t.endTime).getTime(),
