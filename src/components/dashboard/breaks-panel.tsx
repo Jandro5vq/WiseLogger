@@ -28,6 +28,12 @@ function localTimeToISO(entryDate: string, time: string): string {
   return new Date(`${entryDate}T${time}:00`).toISOString()
 }
 
+/** Current local time as HH:MM, used to default the "add break" form. */
+function nowHHMM(): string {
+  const d = new Date()
+  return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
+}
+
 function BreakForm({
   initial,
   entryDate,
@@ -136,7 +142,7 @@ export function BreaksPanel({
   useEffect(() => { setBreaks(initialBreaks) }, [initialBreaks])
 
   // add form local state
-  const [addStart, setAddStart] = useState('')
+  const [addStart, setAddStart] = useState(nowHHMM)
   const [addDuration, setAddDuration] = useState('30')
   const [addLabel, setAddLabel] = useState('')
   const [adding, setAdding] = useState(false)
@@ -167,7 +173,7 @@ export function BreaksPanel({
     if (res.ok) {
       setBreaks((prev) => [...prev, data.break])
       notifyPisadas(data.deletedDescriptions ?? [])
-      setAddStart('')
+      setAddStart(nowHHMM())
       setAddDuration('30')
       setAddLabel('')
       setShowAdd(false)
@@ -224,7 +230,7 @@ export function BreaksPanel({
         </div>
         {!showAdd && (
           <button
-            onClick={() => setShowAdd(true)}
+            onClick={() => { setAddStart(nowHHMM()); setShowAdd(true) }}
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             <Plus width={14} height={14} />
@@ -235,7 +241,7 @@ export function BreaksPanel({
 
       <div className="p-4 space-y-2">
         {breaks.length === 0 && !showAdd && (
-          <p className="text-xs text-muted-foreground text-center py-2">Sin pausas programadas hoy.</p>
+          <p className="text-xs text-muted-foreground text-center py-2">Sin pausas este día.</p>
         )}
 
         {breaks.map((b) => (

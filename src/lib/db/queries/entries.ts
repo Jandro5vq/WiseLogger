@@ -56,3 +56,8 @@ export function listUnclosedEntriesBefore(userId: string, date: string) {
     .orderBy(entries.date)
     .all()
 }
+
+/** Every entry across every user — used by the startup overlap sweep. */
+export function listAllEntries() {
+  return db.select().from(entries).all()
+}

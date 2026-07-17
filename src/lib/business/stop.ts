@@ -47,23 +47,39 @@ export function stopTask(
 
   // Clamp endTime to the earliest obstacle (existing completed span or break) that
   // starts after the active task's own startTime and before the proposed endTime.
+  // Also detect an obstacle that already covers the task's own start — that is
+  // pre-existing corrupt state (nothing here can fix it by picking an endTime),
+  // so reject instead of silently persisting a stop that still overlaps.
   const obstacles: number[] = []
+  let coversOwnStart = false
 
   // Completed spans that would be overlapped
   const siblings = listTasksForEntry(task.entryId)
   for (const t of siblings) {
     if (t.id === taskId || !t.endTime) continue
     const tStart = new Date(t.startTime).getTime()
+    const tEnd = new Date(t.endTime).getTime()
+    if (tStart <= taskStart && tEnd > taskStart) { coversOwnStart = true; break }
     if (tStart > taskStart && tStart < proposed) obstacles.push(tStart)
   }
 
   // Breaks that would be overlapped
   const entry = getEntryById(task.entryId)
-  if (entry) {
+  if (!coversOwnStart && entry) {
     for (const b of getEntryBreaks(task.entryId)) {
-      const { startIso } = breakToInterval(b, entry.date)
+      const { startIso, endIso } = breakToInterval(b, entry.date)
       const bStart = new Date(startIso).getTime()
+      const bEnd = new Date(endIso).getTime()
+      if (bStart <= taskStart && bEnd > taskStart) { coversOwnStart = true; break }
       if (bStart > taskStart && bStart < proposed) obstacles.push(bStart)
+    }
+  }
+
+  if (coversOwnStart) {
+    return {
+      ok: false,
+      error: 'La tarea se solapa con una pausa o tarea existente y no se puede detener así; corrígela desde el historial',
+      status: 409,
     }
   }
 

@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import type { TaskWithTags } from '@/types/db'
+import { readTaskPalette, DEFAULT_TASK_PALETTE } from '@/lib/task-colors'
 
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
@@ -19,17 +20,6 @@ function fmtDuration(ms: number): string {
   if (m > 0) return `${m}m ${sec.toString().padStart(2, '0')}s`
   return `${sec}s`
 }
-
-// ─── palette ─────────────────────────────────────────────────────────────────
-
-const PALETTE = [
-  { hex: '#3b82f6', tw: 'text-blue-500'   },
-  { hex: '#a855f7', tw: 'text-purple-500' },
-  { hex: '#f97316', tw: 'text-orange-500' },
-  { hex: '#14b8a6', tw: 'text-teal-500'   },
-  { hex: '#ec4899', tw: 'text-pink-500'   },
-  { hex: '#eab308', tw: 'text-yellow-500' },
-]
 
 const ROW_H   = 32  // px height per swimlane row
 const AXIS_H  = 20  // px height for time labels below chart
@@ -55,6 +45,8 @@ interface DayTimelineProps {
 
 export function DayTimeline({ tasks, breaks = [], entryDate }: DayTimelineProps) {
   const [now, setNow] = useState(() => Date.now())
+  const [palette, setPalette] = useState<string[]>(() => [...DEFAULT_TASK_PALETTE])
+  useEffect(() => { setPalette(readTaskPalette()) }, [])
   const hasActive = tasks.some((t) => !t.endTime)
 
   useEffect(() => {
@@ -107,7 +99,7 @@ export function DayTimeline({ tasks, breaks = [], entryDate }: DayTimelineProps)
   let ci = 0
   for (const t of segments) {
     if (!colorIdx.has(t.description)) {
-      colorIdx.set(t.description, ci++ % PALETTE.length)
+      colorIdx.set(t.description, ci++ % palette.length)
       rows.push(t.description)
     }
   }
@@ -153,7 +145,7 @@ export function DayTimeline({ tasks, breaks = [], entryDate }: DayTimelineProps)
           <div className="shrink-0 flex flex-col" style={{ width: 110, height: chartH }}>
             {rows.map((desc) => {
               const isBreaksRow = desc === breaksRowLabel
-              const color = isBreaksRow ? BREAK_COLOR : PALETTE[colorIdx.get(desc) ?? 0].hex
+              const color = isBreaksRow ? BREAK_COLOR : palette[colorIdx.get(desc) ?? 0]
               return (
                 <div
                   key={desc}
@@ -205,7 +197,7 @@ export function DayTimeline({ tasks, breaks = [], entryDate }: DayTimelineProps)
                 const tEnd     = task.endTime ? new Date(task.endTime).getTime() : now
                 const left     = pct(tStart)
                 const width    = Math.max(pct(tEnd) - pct(tStart), 0.3)
-                const color    = PALETTE[colorIdx.get(task.description) ?? 0]
+                const color    = palette[colorIdx.get(task.description) ?? 0]
                 const isActive = !task.endTime
                 const dur      = fmtDuration(tEnd - tStart)
 
@@ -219,10 +211,10 @@ export function DayTimeline({ tasks, breaks = [], entryDate }: DayTimelineProps)
                       width:           `${width}%`,
                       top:             rowI * ROW_H + 5,
                       height:          ROW_H - 10,
-                      backgroundColor: color.hex,
+                      backgroundColor: color,
                       opacity:         isActive ? 1 : 0.80,
                       transition:      'width 0.4s ease',
-                      boxShadow:       isActive ? `0 0 8px 1px ${color.hex}66` : undefined,
+                      boxShadow:       isActive ? `0 0 8px 1px ${color}66` : undefined,
                     }}
                   >
                     {width > 5 && (
@@ -289,16 +281,16 @@ export function DayTimeline({ tasks, breaks = [], entryDate }: DayTimelineProps)
         {/* ── totals legend ── */}
         <div className="flex flex-wrap gap-x-5 gap-y-1.5 pt-2 border-t border-border/40">
           {rows.filter((r) => r !== breaksRowLabel).map((desc) => {
-            const p     = PALETTE[colorIdx.get(desc) ?? 0]
+            const p     = palette[colorIdx.get(desc) ?? 0]
             const total = totals.get(desc) ?? 0
             const live  = tasks.some((t) => t.description === desc && !t.endTime)
             return (
               <div key={desc} className="flex items-center gap-1.5">
-                <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: p.hex }} />
+                <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: p }} />
                 <span className="text-xs text-muted-foreground truncate max-w-[9rem]" title={desc}>
                   {desc}
                 </span>
-                <span className={`text-xs font-bold font-mono tabular-nums ${p.tw}`}>
+                <span className="text-xs font-bold font-mono tabular-nums" style={{ color: p }}>
                   {fmtDuration(total)}
                 </span>
                 {live && (

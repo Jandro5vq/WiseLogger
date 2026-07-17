@@ -31,13 +31,19 @@ interface EntryEditorProps {
   breaks?: { startIso: string; endIso: string }[]
 }
 
-function AddTaskForm({ entryId, onAdded }: { entryId: string; onAdded: () => void }) {
+/** Current local HH:MM combined with the viewed day's date, so the default start
+ * time never drifts to today's date when editing a past day. */
+function defaultStartForDay(date: string): string {
+  const nowInput = isoToLocalInput(new Date().toISOString())
+  return `${date}T${nowInput.slice(11)}`
+}
+
+function AddTaskForm({ entryId, date, onAdded }: { entryId: string; date: string; onAdded: () => void }) {
   const toast = useToast()
-  const now = new Date()
   const [description, setDescription] = useState('')
   const [tagsInput, setTagsInput] = useState('')
   const [notes, setNotes] = useState('')
-  const [startTime, setStartTime] = useState(isoToLocalInput(now.toISOString()))
+  const [startTime, setStartTime] = useState(() => defaultStartForDay(date))
   const [endTime, setEndTime] = useState('')
   const [favorites, setFavorites] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
@@ -316,6 +322,7 @@ export function EntryEditor({ date, entry, tasks, breaks = [] }: EntryEditorProp
           {showAdd && (
             <AddTaskForm
               entryId={entry.id}
+              date={date}
               onAdded={() => { setShowAdd(false); startTransition(() => router.refresh()) }}
             />
           )}

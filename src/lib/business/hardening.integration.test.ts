@@ -196,6 +196,21 @@ describe('stopTask', () => {
     if (result.ok) expect(result.task.endTime).toBe('2026-03-10T10:00:00.000Z')
   })
 
+  it('rejects stopping when a break already covers the task\'s own start', () => {
+    // Pre-existing corrupt state (a break created before this hardening could
+    // still cover the start of an already-running task). No endTime can fix
+    // that — stopTask must refuse rather than persist a stop that still overlaps.
+    const userId = makeUser()
+    const entry = makeEntry(userId, '2026-03-10')
+    const t = createTask({ id: uuidv4(), entryId: entry.id, userId, startTime: '2026-03-10T09:30:00.000Z', description: 'Active', tags: '[]' })
+    createEntryBreak({ id: uuidv4(), entryId: entry.id, userId, breakStart: '2026-03-10T09:00:00.000Z', durationMinutes: 60, label: null, fromRuleId: null })
+
+    const result = stopTask(t.id, userId, 'UTC', '2026-03-10T11:00:00.000Z')
+    expect(result.ok).toBe(false)
+    if (!result.ok) expect(result.status).toBe(409)
+    expect(getTaskById(t.id)!.endTime).toBeNull()
+  })
+
   it('splits a stop that crosses local midnight into per-day segments', () => {
     const userId = makeUser()
     const entry = makeEntry(userId, '2026-03-11', 480, '2026-03-11T22:00:00.000Z')

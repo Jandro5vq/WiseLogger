@@ -6,6 +6,9 @@ export async function register() {
     const { runStartupBreakNormalization } = await import('@/lib/business/normalize-breaks')
     runStartupBreakNormalization()
 
+    const { runStartupOverlapSweep } = await import('@/lib/business/overlaps')
+    runStartupOverlapSweep()
+
     const { runStartupAutoClose, scheduleAutoClose } = await import('@/lib/business/auto-close')
     runStartupAutoClose()
     scheduleAutoClose()
