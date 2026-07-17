@@ -15,6 +15,7 @@ import {
   setStoredCustomAccent,
   type AccentId,
 } from '@/components/layout/accent-provider'
+import { readTaskPalette, writeTaskPaletteColor, resetTaskPalette, DEFAULT_TASK_PALETTE } from '@/lib/task-colors'
 
 // ─── Break rules ─────────────────────────────────────────────────────────────
 
@@ -734,6 +735,62 @@ function AccentPicker() {
   )
 }
 
+function TaskColorPicker() {
+  const [palette, setPalette] = useState<string[]>([...DEFAULT_TASK_PALETTE])
+  useEffect(() => {
+    setPalette(readTaskPalette())
+  }, [])
+
+  function choose(index: number, hex: string) {
+    setPalette(writeTaskPaletteColor(index, hex))
+  }
+
+  function reset() {
+    setPalette(resetTaskPalette())
+  }
+
+  return (
+    <div className="flex flex-col gap-3">
+      <div className="flex items-center justify-between gap-4">
+        <div>
+          <p className="text-sm font-medium">Colores de tareas</p>
+          <p className="text-xs text-muted-foreground mt-0.5">
+            Se repiten en el timeline según el orden en que aparecen las tareas del día
+          </p>
+        </div>
+        <div className="flex items-center gap-2 flex-wrap justify-end">
+          {palette.map((hex, i) => (
+            <label
+              key={i}
+              title={`Color ${i + 1}`}
+              aria-label={`Color de tarea ${i + 1}`}
+              className="relative h-7 w-7 rounded-full border-2 border-border transition-transform hover:scale-110 cursor-pointer overflow-hidden shadow-sm"
+              style={{ backgroundColor: hex }}
+            >
+              <input
+                type="color"
+                value={hex}
+                onChange={(e) => choose(i, e.target.value)}
+                aria-label={`Elegir color de tarea ${i + 1}`}
+                className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+              />
+            </label>
+          ))}
+        </div>
+      </div>
+      <div>
+        <button
+          type="button"
+          onClick={reset}
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors underline underline-offset-2"
+        >
+          Restablecer colores por defecto
+        </button>
+      </div>
+    </div>
+  )
+}
+
 function WorkdayAdjustToggle({
   storageKey,
   label,
@@ -1054,9 +1111,12 @@ export default function SettingsPage() {
       </section>
 
       {/* Apariencia */}
-      <section data-tour="appearance" className="rounded-lg border border-border bg-card p-6">
-        <h2 className="text-lg font-semibold mb-4">Apariencia</h2>
+      <section data-tour="appearance" className="rounded-lg border border-border bg-card p-6 space-y-6">
+        <h2 className="text-lg font-semibold">Apariencia</h2>
         <AccentPicker />
+        <div className="border-t border-border/60 pt-6">
+          <TaskColorPicker />
+        </div>
       </section>
 
       {/* Calendario */}
