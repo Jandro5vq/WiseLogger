@@ -96,19 +96,25 @@ describe('POST /api/entries/[id]/tasks — backdated active task guard', () => {
   })
 
   it('still closes the active task for a later-starting new active task', async () => {
-    const { id: userId } = makeUser()
-    const entry = createEntry({ id: uuidv4(), userId, date: '2026-04-07', expectedMinutes: 480 })
-    const active = createTask({
-      id: uuidv4(), entryId: entry.id, userId,
-      startTime: '2026-04-07T09:00:00.000Z', description: 'Running', tags: '[]',
-    })
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-04-07T11:00:00.000Z'))
+    try {
+      const { id: userId } = makeUser()
+      const entry = createEntry({ id: uuidv4(), userId, date: '2026-04-07', expectedMinutes: 480 })
+      const active = createTask({
+        id: uuidv4(), entryId: entry.id, userId,
+        startTime: '2026-04-07T09:00:00.000Z', description: 'Running', tags: '[]',
+      })
 
-    const res = await createTaskRoute(
-      jsonRequest({ description: 'Next', startTime: '2026-04-07T10:00:00.000Z' }),
-      { params: { id: entry.id } }
-    )
-    expect(res.status).toBe(201)
-    expect(getTaskById(active.id)!.endTime).toBe('2026-04-07T10:00:00.000Z')
+      const res = await createTaskRoute(
+        jsonRequest({ description: 'Next', startTime: '2026-04-07T10:00:00.000Z' }),
+        { params: { id: entry.id } }
+      )
+      expect(res.status).toBe(201)
+      expect(getTaskById(active.id)!.endTime).toBe('2026-04-07T10:00:00.000Z')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
@@ -294,45 +300,57 @@ describe('POST /api/entries/[id]/tasks — date-entry validation (D5)', () => {
 
 describe('POST /api/entries/[id]/tasks — closing the active task respects obstacles (D6)', () => {
   it('clamps the closed active task to the earliest obstacle, not the new task\'s raw start', async () => {
-    const { id: userId } = makeUser()
-    const entry = createEntry({ id: uuidv4(), userId, date: '2026-05-11', expectedMinutes: 480 })
-    const active = createTask({
-      id: uuidv4(), entryId: entry.id, userId,
-      startTime: '2026-05-11T08:00:00.000Z', description: 'Running', tags: '[]',
-    })
-    // A break between the active task's start and the new active task's start.
-    createEntryBreak({
-      id: uuidv4(), entryId: entry.id, userId,
-      breakStart: '2026-05-11T09:00:00.000Z', durationMinutes: 30, label: null, fromRuleId: null,
-    })
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-11T12:00:00.000Z'))
+    try {
+      const { id: userId } = makeUser()
+      const entry = createEntry({ id: uuidv4(), userId, date: '2026-05-11', expectedMinutes: 480 })
+      const active = createTask({
+        id: uuidv4(), entryId: entry.id, userId,
+        startTime: '2026-05-11T08:00:00.000Z', description: 'Running', tags: '[]',
+      })
+      // A break between the active task's start and the new active task's start.
+      createEntryBreak({
+        id: uuidv4(), entryId: entry.id, userId,
+        breakStart: '2026-05-11T09:00:00.000Z', durationMinutes: 30, label: null, fromRuleId: null,
+      })
 
-    const res = await createTaskRoute(
-      jsonRequest({ description: 'Next', startTime: '2026-05-11T11:00:00.000Z' }),
-      { params: { id: entry.id } }
-    )
-    expect(res.status).toBe(201)
-    assertEntryInvariants(entry.id)
-    expect(getTaskById(active.id)!.endTime).toBe('2026-05-11T09:00:00.000Z')
+      const res = await createTaskRoute(
+        jsonRequest({ description: 'Next', startTime: '2026-05-11T11:00:00.000Z' }),
+        { params: { id: entry.id } }
+      )
+      expect(res.status).toBe(201)
+      assertEntryInvariants(entry.id)
+      expect(getTaskById(active.id)!.endTime).toBe('2026-05-11T09:00:00.000Z')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })
 
 describe('PATCH /api/tasks/[id] — active task hardening (D2–D5)', () => {
   it('rejects endTime:null reactivation when another task is already active', async () => {
-    const { id: userId } = makeUser()
-    const entry = createEntry({ id: uuidv4(), userId, date: '2026-05-05', expectedMinutes: 480 })
-    createTask({
-      id: uuidv4(), entryId: entry.id, userId,
-      startTime: '2026-05-05T09:00:00.000Z', description: 'Running', tags: '[]',
-    })
-    const completed = createTask({
-      id: uuidv4(), entryId: entry.id, userId,
-      startTime: '2026-05-05T07:00:00.000Z', endTime: '2026-05-05T08:00:00.000Z',
-      description: 'Earlier', tags: '[]',
-    })
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-05-05T10:00:00.000Z'))
+    try {
+      const { id: userId } = makeUser()
+      const entry = createEntry({ id: uuidv4(), userId, date: '2026-05-05', expectedMinutes: 480 })
+      createTask({
+        id: uuidv4(), entryId: entry.id, userId,
+        startTime: '2026-05-05T09:00:00.000Z', description: 'Running', tags: '[]',
+      })
+      const completed = createTask({
+        id: uuidv4(), entryId: entry.id, userId,
+        startTime: '2026-05-05T07:00:00.000Z', endTime: '2026-05-05T08:00:00.000Z',
+        description: 'Earlier', tags: '[]',
+      })
 
-    const res = await patchTaskRoute(jsonRequest({ endTime: null }), { params: { id: completed.id } })
-    expect(res.status).toBe(409)
-    expect(getTaskById(completed.id)!.endTime).toBe('2026-05-05T08:00:00.000Z')
+      const res = await patchTaskRoute(jsonRequest({ endTime: null }), { params: { id: completed.id } })
+      expect(res.status).toBe(409)
+      expect(getTaskById(completed.id)!.endTime).toBe('2026-05-05T08:00:00.000Z')
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('reactivating a completed task validates and carves against its new elapsed span', async () => {
@@ -496,6 +514,46 @@ describe('POST /api/entries/[id]/breaks — carves the active task too (D8, lega
       expect(res.status).toBe(201)
       assertEntryInvariants(entry.id)
       expect(getTaskById(active.id)!.endTime).toBe('2026-05-14T08:30:00.000Z')
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+})
+
+describe('active tasks are rejected on any day other than today', () => {
+  it('POST without endTime is rejected when the entry is not today', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T12:00:00.000Z'))
+    try {
+      const { id: userId } = makeUser()
+      const entry = createEntry({ id: uuidv4(), userId, date: '2026-05-30', expectedMinutes: 480 })
+
+      const res = await createTaskRoute(
+        jsonRequest({ description: 'Forgot to log', startTime: '2026-05-30T09:00:00.000Z' }),
+        { params: { id: entry.id } }
+      )
+      expect(res.status).toBe(400)
+      expect(listTasksForEntry(entry.id)).toHaveLength(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('PATCH endTime:null reactivation is rejected when the task is not on today\'s entry', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-06-01T12:00:00.000Z'))
+    try {
+      const { id: userId } = makeUser()
+      const entry = createEntry({ id: uuidv4(), userId, date: '2026-05-30', expectedMinutes: 480 })
+      const completed = createTask({
+        id: uuidv4(), entryId: entry.id, userId,
+        startTime: '2026-05-30T07:00:00.000Z', endTime: '2026-05-30T08:00:00.000Z',
+        description: 'Past task', tags: '[]',
+      })
+
+      const res = await patchTaskRoute(jsonRequest({ endTime: null }), { params: { id: completed.id } })
+      expect(res.status).toBe(400)
+      expect(getTaskById(completed.id)!.endTime).toBe('2026-05-30T08:00:00.000Z')
     } finally {
       vi.useRealTimers()
     }

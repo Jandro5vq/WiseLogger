@@ -240,7 +240,7 @@ export function ActiveTaskTimer({ task, loadedDate, entryId, breaks, timezone }:
           />
           <div>
             <label className="text-xs text-muted-foreground">Hora de inicio</label>
-            <DateTimeInput value={editStart} onChange={setEditStart} required />
+            <DateTimeInput value={editStart} onChange={setEditStart} contextDate={loadedDate} required />
           </div>
           {error && <p className="text-xs text-destructive">{error}</p>}
           <div className="flex gap-2">

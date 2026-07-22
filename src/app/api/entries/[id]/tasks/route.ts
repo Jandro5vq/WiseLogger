@@ -157,6 +157,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         })()
       }
     } else {
+      // An open-ended (active) task only makes sense on today's entry — a past
+      // day is by definition already over, so it can never legitimately have an
+      // in-progress task "still running".
+      if (entry.date !== dateStringInTz(new Date(), session.user.timezone)) {
+        throw new WriteConflictError('No se puede dejar una tarea en curso en un día pasado; indica una hora de fin', 400)
+      }
+
       // Active task: point-in-break check for startTime only (breaks are immutable here)
       const insideBreak = breakIntervals.some((iv) => tStart > iv.start && tStart < iv.end)
       if (insideBreak) {

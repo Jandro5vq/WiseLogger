@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { formatMinutes, isoToLocalInput } from '@/lib/utils'
+import { formatMinutes, isoToLocalInput, localDateString } from '@/lib/utils'
 import { sumWorkedMinutes } from '@/lib/business/break-math'
 import type { Entry, TaskWithTags } from '@/types/db'
 import { TaskList } from '@/components/dashboard/task-list'
@@ -49,6 +49,10 @@ function AddTaskForm({ entryId, date, onAdded }: { entryId: string; date: string
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
+  // A past day is already over — it can never have a task "still in progress",
+  // so the end time can't be left blank the way it can for today.
+  const isToday = date === localDateString()
+
   // Recent task names, newest first — surfaced as native datalist suggestions.
   useEffect(() => {
     fetch('/api/tasks/favorites')
@@ -60,6 +64,10 @@ function AddTaskForm({ entryId, date, onAdded }: { entryId: string; date: string
   async function save(e: React.FormEvent) {
     e.preventDefault()
     if (!description.trim()) return
+    if (!isToday && !endTime) {
+      setError('Indica una hora de fin: un día pasado no puede quedar con una tarea en curso')
+      return
+    }
     setError('')
     setSaving(true)
     const tags = tagsInput.split(',').map((t) => t.trim()).filter(Boolean)
@@ -119,11 +127,13 @@ function AddTaskForm({ entryId, date, onAdded }: { entryId: string; date: string
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="text-xs text-muted-foreground">Inicio</label>
-          <DateTimeInput value={startTime} onChange={setStartTime} required />
+          <DateTimeInput value={startTime} onChange={setStartTime} contextDate={date} required />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground">Fin <span className="opacity-50">(opcional)</span></label>
-          <DateTimeInput value={endTime} onChange={setEndTime} />
+          <label className="text-xs text-muted-foreground">
+            Fin {isToday && <span className="opacity-50">(opcional)</span>}
+          </label>
+          <DateTimeInput value={endTime} onChange={setEndTime} contextDate={date} required={!isToday} />
         </div>
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
@@ -171,7 +181,7 @@ function WorkdayHoursEditor({ entry }: { entry: Entry }) {
         <div className="grid grid-cols-2 gap-3">
           <div>
             <label className="text-xs text-muted-foreground block mb-1">Inicio</label>
-            <DateTimeInput value={startInput} onChange={setStartInput} />
+            <DateTimeInput value={startInput} onChange={setStartInput} contextDate={entry.date} />
             <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer mt-1.5">
               <input
                 type="checkbox"
@@ -184,7 +194,7 @@ function WorkdayHoursEditor({ entry }: { entry: Entry }) {
           </div>
           <div>
             <label className="text-xs text-muted-foreground block mb-1">Fin</label>
-            <DateTimeInput value={endInput} onChange={setEndInput} />
+            <DateTimeInput value={endInput} onChange={setEndInput} contextDate={entry.date} />
             <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer mt-1.5">
               <input
                 type="checkbox"
@@ -217,6 +227,8 @@ export function EntryEditor({ date, entry, tasks, breaks = [] }: EntryEditorProp
   const [saving, setSaving] = useState(false)
   const [dayOffLoading, setDayOffLoading] = useState(false)
   const [showAdd, setShowAdd] = useState(false)
+  const [generating, setGenerating] = useState(false)
+  const [generateError, setGenerateError] = useState('')
 
   const isDayOff = entry?.expectedMinutes === 0
 
@@ -251,10 +263,36 @@ export function EntryEditor({ date, entry, tasks, breaks = [] }: EntryEditorProp
     startTransition(() => router.refresh())
   }
 
+  async function generateEntry() {
+    setGenerating(true)
+    setGenerateError('')
+    const res = await fetch('/api/entries', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ date }),
+    })
+    setGenerating(false)
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      setGenerateError(data.error ?? 'Error al generar la jornada')
+      return
+    }
+    toast.success('Jornada generada')
+    startTransition(() => router.refresh())
+  }
+
   if (!entry) {
     return (
-      <div className="rounded-lg border border-border bg-card p-6 text-center text-muted-foreground">
-        Sin jornada registrada para este día.
+      <div className="rounded-lg border border-border bg-card p-6 text-center space-y-3">
+        <p className="text-muted-foreground">Sin jornada registrada para este día.</p>
+        <button
+          onClick={generateEntry}
+          disabled={generating}
+          className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+        >
+          {generating ? 'Generando…' : 'Generar jornada para este día'}
+        </button>
+        {generateError && <p className="text-xs text-destructive">{generateError}</p>}
       </div>
     )
   }

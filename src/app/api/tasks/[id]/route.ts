@@ -131,6 +131,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
       // Task will be active after this edit and its time range actually changed
       // (a new startTime, or an explicit endTime: null reactivating a completed
       // task) — validate and carve using its effective span [newStart, now).
+      // An open-ended task only makes sense on today's entry — a past day can't
+      // legitimately have a task "still running".
+      if (entry.date !== dateStringInTz(new Date(), session.user.timezone)) {
+        throw new WriteConflictError('No se puede dejar una tarea en curso en un día pasado', 400)
+      }
+
       const otherActive = getActiveTask(session.user.id)
       if (otherActive && otherActive.id !== task.id) {
         throw new WriteConflictError('Ya hay otra tarea activa; detenla antes de reactivar esta', 409)
