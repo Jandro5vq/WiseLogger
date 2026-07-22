@@ -1,16 +1,28 @@
 'use client'
 
 /**
- * DateTimeInput — date + text-based 24h time input.
- * Uses type="text" for time to avoid the browser rendering AM/PM.
- * value / onChange use "YYYY-MM-DDTHH:MM" format (same as datetime-local).
+ * DateTimeInput — text-based 24h time input for a task/pause field.
+ * Uses type="text" to avoid the browser rendering AM/PM.
+ * value / onChange use "YYYY-MM-DDTHH:MM" format (same as datetime-local) so
+ * existing callers (new Date(value).toISOString(), etc.) don't need to change.
+ *
+ * There is deliberately no date picker: every task/pause always belongs to the
+ * calendar day currently being viewed (today on the dashboard, or the specific
+ * day in History) — the API rejects anything else — so letting the user pick a
+ * different date here would only ever produce a confusing validation error.
+ * `contextDate` supplies that day for the hidden date component.
+ * Time masking/validation lives in @/lib/time-mask, shared with TimeInput.
  */
 
 import { useState } from 'react'
+import { applyTimeKeystroke, isValidTime } from '@/lib/time-mask'
 
 interface DateTimeInputProps {
   value: string
   onChange: (value: string) => void
+  /** Calendar day (YYYY-MM-DD) this field belongs to, used as the hidden date
+   * component whenever `value` doesn't carry one yet. */
+  contextDate: string
   className?: string
   required?: boolean
 }
@@ -21,71 +33,43 @@ function splitDateTime(value: string): { date: string; time: string } {
   return { date, time: time.slice(0, 5) }
 }
 
-/** Auto-format raw keystroke sequence into HH:MM */
-function coerceTime(raw: string): string {
-  // Strip non-digits
-  const digits = raw.replace(/\D/g, '').slice(0, 4)
-  if (digits.length <= 2) return digits
-  return `${digits.slice(0, 2)}:${digits.slice(2)}`
-}
-
-/** Return true if string is a valid HH:MM in 0-23 / 0-59 range */
-function isValidTime(t: string): boolean {
-  const m = t.match(/^(\d{2}):(\d{2})$/)
-  if (!m) return false
-  return parseInt(m[1]) < 24 && parseInt(m[2]) < 60
-}
-
 const base =
-  'rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring'
+  'rounded-md border border-input bg-background px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-ring'
 
-export function DateTimeInput({ value, onChange, className = '', required }: DateTimeInputProps) {
+export function DateTimeInput({ value, onChange, contextDate, className = '', required }: DateTimeInputProps) {
   const { date, time } = splitDateTime(value)
   // Shows an inline error when a blurred time is out of range, instead of the old
   // silent reset that discarded the user's input with no explanation.
   const [error, setError] = useState(false)
 
-  function handleDate(d: string) {
-    onChange(`${d}T${time || '00:00'}`)
-  }
+  function handleTime(rawInput: string) {
+    const raw = applyTimeKeystroke(time, rawInput)
+    if (raw === null) return // reject the keystroke — controlled value snaps back
 
-  function handleTime(raw: string) {
-    const coerced = coerceTime(raw)
-    // Always propagate so the input stays responsive; validated on blur.
-    if (error && isValidTime(coerced)) setError(false)
-    onChange(`${date || new Date().toISOString().split('T')[0]}T${coerced}`)
+    if (error && isValidTime(raw)) setError(false)
+    onChange(`${date || contextDate}T${raw}`)
   }
 
   function handleTimeBlur(raw: string) {
-    const coerced = coerceTime(raw)
-    // Keep the (invalid) value visible so the user can fix it; flag the error.
-    setError(coerced.length > 0 && !isValidTime(coerced))
+    // Keep the (incomplete/invalid) value visible so the user can fix it; flag the error.
+    setError(raw.length > 0 && !isValidTime(raw))
   }
 
   return (
     <div className={className}>
-      <div className="flex gap-2">
-        <input
-          type="date"
-          value={date}
-          onChange={(e) => handleDate(e.target.value)}
-          required={required}
-          className={base}
-        />
-        <input
-          type="text"
-          value={time}
-          onChange={(e) => handleTime(e.target.value)}
-          onBlur={(e) => handleTimeBlur(e.target.value)}
-          placeholder="HH:MM"
-          maxLength={5}
-          inputMode="numeric"
-          pattern="[0-2][0-9]:[0-5][0-9]"
-          required={required}
-          aria-invalid={error}
-          className={`${base} w-24 font-mono ${error ? 'border-destructive focus:ring-destructive' : ''}`}
-        />
-      </div>
+      <input
+        type="text"
+        value={time}
+        onChange={(e) => handleTime(e.target.value)}
+        onBlur={(e) => handleTimeBlur(e.target.value)}
+        placeholder="HH:MM"
+        maxLength={5}
+        inputMode="numeric"
+        pattern="[0-2][0-9]:[0-5][0-9]"
+        required={required}
+        aria-invalid={error}
+        className={`${base} w-24 ${error ? 'border-destructive focus:ring-destructive' : ''}`}
+      />
       {error && (
         <p className="mt-1 text-xs text-destructive">Hora no válida (HH:MM, 00:00–23:59)</p>
       )}

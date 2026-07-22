@@ -8,6 +8,8 @@ import { PenSquare } from 'pixelarticons/react'
 
 interface DayControlsProps {
   entryId: string
+  /** Calendar day (YYYY-MM-DD) this entry belongs to — always today on the dashboard. */
+  entryDate: string
   entryStartTime: string
   entryEndTime?: string           // set when the day is closed
   expectedEndTime: string         // precomputed ISO string for "fin de jornada"
@@ -36,6 +38,7 @@ function useAdjustPref(key: string): [boolean, (v: boolean) => void] {
 
 export function DayControls({
   entryId,
+  entryDate,
   entryStartTime,
   entryEndTime,
   expectedEndTime,
@@ -137,7 +140,7 @@ export function DayControls({
           <span className="text-xs text-muted-foreground w-10">Inicio</span>
           {editingStart ? (
             <form onSubmit={saveStartTime} className="flex flex-wrap items-center gap-2 flex-1">
-              <DateTimeInput value={startInput} onChange={setStartInput} />
+              <DateTimeInput value={startInput} onChange={setStartInput} contextDate={entryDate} />
               <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
                 <input
                   type="checkbox"
@@ -190,7 +193,7 @@ export function DayControls({
             <span className="text-xs text-muted-foreground w-10">Fin</span>
             {editingEnd ? (
               <form onSubmit={saveEndTime} className="flex flex-wrap items-center gap-2 flex-1">
-                <DateTimeInput value={endInput} onChange={setEndInput} />
+                <DateTimeInput value={endInput} onChange={setEndInput} contextDate={entryDate} />
                 <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
                   <input
                     type="checkbox"
@@ -247,7 +250,7 @@ export function DayControls({
 
         {editingStart ? (
           <form onSubmit={saveStartTime} className="flex flex-wrap items-center gap-2 flex-1">
-            <DateTimeInput value={startInput} onChange={setStartInput} />
+            <DateTimeInput value={startInput} onChange={setStartInput} contextDate={entryDate} />
             <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer">
               <input
                 type="checkbox"

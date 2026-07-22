@@ -2,7 +2,7 @@
 
 import { useRouter } from 'next/navigation'
 import { useState, useEffect, useRef, useCallback, useTransition } from 'react'
-import { formatMinutes, isoToLocalInput } from '@/lib/utils'
+import { formatMinutes, isoToLocalInput, localDateString } from '@/lib/utils'
 import type { TaskWithTags } from '@/types/db'
 import { DateTimeInput } from '@/components/ui/date-time-input'
 import { ConfirmButton } from '@/components/ui/confirm-button'
@@ -32,9 +32,18 @@ function EditTaskForm({ task, onDone, siblingIds }: { task: TaskWithTags; onDone
   const [endTime, setEndTime] = useState(task.endTime ? isoToLocalInput(task.endTime) : '')
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
+  // A task always lives on a single calendar day — its own startTime already tells us which.
+  const contextDate = isoToLocalInput(task.startTime).slice(0, 10)
+  // A past day is already over — it can't be left with a task "still in progress",
+  // so clearing the end time to reactivate it only makes sense for today.
+  const isToday = contextDate === localDateString()
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
+    if (!isToday && !endTime) {
+      setError('Indica una hora de fin: un día pasado no puede quedar con una tarea en curso')
+      return
+    }
     setSaving(true)
     setError('')
     const tags = tagsInput.split(',').map((t) => t.trim()).filter(Boolean)
@@ -107,11 +116,13 @@ function EditTaskForm({ task, onDone, siblingIds }: { task: TaskWithTags; onDone
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div>
           <label className="text-xs text-muted-foreground">Inicio</label>
-          <DateTimeInput value={startTime} onChange={setStartTime} required />
+          <DateTimeInput value={startTime} onChange={setStartTime} contextDate={contextDate} required />
         </div>
         <div>
-          <label className="text-xs text-muted-foreground">Fin</label>
-          <DateTimeInput value={endTime} onChange={setEndTime} />
+          <label className="text-xs text-muted-foreground">
+            Fin {isToday && <span className="opacity-50">(opcional)</span>}
+          </label>
+          <DateTimeInput value={endTime} onChange={setEndTime} contextDate={contextDate} required={!isToday} />
         </div>
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}
@@ -155,12 +166,15 @@ function AddSpanForm({
   const router = useRouter()
   const [, startTransition] = useTransition()
   const toast = useToast()
-  const defaultTime = useCallback(() => {
-    const nowInput = isoToLocalInput(new Date().toISOString())
+  const defaultTime = useCallback((offsetMinutes = 0) => {
+    const nowInput = isoToLocalInput(new Date(Date.now() + offsetMinutes * 60_000).toISOString())
     return entryDate ? `${entryDate}T${nowInput.slice(11)}` : nowInput
   }, [entryDate])
-  const [startTime, setStartTime] = useState(defaultTime)
-  const [endTime, setEndTime] = useState(defaultTime)
+  // Defaults must not be identical — a session ending exactly when it started
+  // fails the endTime > startTime check, and submitting untouched looked to the
+  // user like they'd left the end time blank when it was really just prefilled.
+  const [startTime, setStartTime] = useState(() => defaultTime(-30))
+  const [endTime, setEndTime] = useState(() => defaultTime())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState('')
 
@@ -200,11 +214,11 @@ function AddSpanForm({
       <div className="grid grid-cols-2 gap-2">
         <div>
           <label className="text-xs text-muted-foreground">Inicio</label>
-          <DateTimeInput value={startTime} onChange={setStartTime} required />
+          <DateTimeInput value={startTime} onChange={setStartTime} contextDate={entryDate ?? startTime.slice(0, 10)} required />
         </div>
         <div>
           <label className="text-xs text-muted-foreground">Fin</label>
-          <DateTimeInput value={endTime} onChange={setEndTime} required />
+          <DateTimeInput value={endTime} onChange={setEndTime} contextDate={entryDate ?? endTime.slice(0, 10)} required />
         </div>
       </div>
       {error && <p className="text-xs text-destructive">{error}</p>}

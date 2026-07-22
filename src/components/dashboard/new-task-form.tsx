@@ -15,6 +15,8 @@ interface Favorite {
 
 interface NewTaskFormProps {
   entryId: string
+  /** Calendar day (YYYY-MM-DD) this entry belongs to — always today on the dashboard. */
+  entryDate: string
   activeTaskId?: string // if set, it will be stopped first
   /** Description of the active task — hides its quick-start chip while it runs */
   activeTaskDescription?: string
@@ -22,7 +24,7 @@ interface NewTaskFormProps {
   defaultStartTime?: string
 }
 
-export function NewTaskForm({ entryId, activeTaskId, activeTaskDescription, defaultStartTime }: NewTaskFormProps) {
+export function NewTaskForm({ entryId, entryDate, activeTaskId, activeTaskDescription, defaultStartTime }: NewTaskFormProps) {
   const router = useRouter()
   const toast = useToast()
   const [open, setOpen] = useState(false)
@@ -59,6 +61,9 @@ export function NewTaskForm({ entryId, activeTaskId, activeTaskDescription, defa
   function openForm() {
     loadFavorites()
     setStartTime(isoToLocalInput(defaultStartTime ?? new Date().toISOString()))
+    // Always start blank — a leftover endTime from a previous open+cancel would
+    // otherwise silently carry over and make the task look "completed" by default.
+    setEndTime('')
     setOpen(true)
   }
 
@@ -220,11 +225,11 @@ export function NewTaskForm({ entryId, activeTaskId, activeTaskDescription, defa
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
         <div>
           <label className="block text-xs text-muted-foreground mb-1">Hora de inicio</label>
-          <DateTimeInput value={startTime} onChange={setStartTime} />
+          <DateTimeInput value={startTime} onChange={setStartTime} contextDate={entryDate} />
         </div>
         <div>
           <label className="block text-xs text-muted-foreground mb-1">Hora de fin <span className="opacity-50">(opcional)</span></label>
-          <DateTimeInput value={endTime} onChange={setEndTime} />
+          <DateTimeInput value={endTime} onChange={setEndTime} contextDate={entryDate} />
         </div>
       </div>
 

@@ -78,6 +78,7 @@ export default async function DashboardPage() {
 
       <DayControls
         entryId={entry.id}
+        entryDate={today}
         entryStartTime={entryStartTime}
         entryEndTime={entry.endTime ?? undefined}
         expectedEndTime={expectedEndIso}
@@ -128,6 +129,7 @@ export default async function DashboardPage() {
           {!isClosed && (
             <NewTaskForm
               entryId={entry.id}
+              entryDate={today}
               activeTaskId={activeTask?.id}
               activeTaskDescription={activeTask?.description}
               defaultStartTime={newTaskDefaultStart}
