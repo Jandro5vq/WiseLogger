@@ -58,9 +58,17 @@ export async function middleware(request: NextRequest) {
 
   // CSRF: verify Origin on state-changing requests (exempt /api/mcp — uses API key auth)
   if (isApiRoute && !pathname.startsWith('/api/mcp') && ['POST', 'PATCH', 'PUT', 'DELETE'].includes(request.method)) {
+    // Compare against the host the browser actually addressed (Host, or the proxy's
+    // X-Forwarded-Host), not request.nextUrl.origin: inside Docker that is built from
+    // the server's own HOSTNAME (the container id), so it never matches the browser.
     const origin = request.headers.get('origin')
-    if (origin && origin !== request.nextUrl.origin) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (origin) {
+      const host = request.headers.get('x-forwarded-host') ?? request.headers.get('host')
+      let originHost: string | null = null
+      try { originHost = new URL(origin).host } catch { /* malformed or "null" origin */ }
+      if (!host || originHost !== host) {
+        return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+      }
     }
   }
 
