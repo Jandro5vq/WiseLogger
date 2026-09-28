@@ -65,3 +65,14 @@ export function applyTimeKeystroke(prevValue: string, rawInput: string): string 
 
   return raw
 }
+
+/**
+ * For a task form's "YYYY-MM-DDTHH:MM" start/end values: returns an error message
+ * if a non-empty field holds an incomplete/invalid time, or null if both are fine.
+ */
+export function incompleteTimeError(start: string, end: string): string | null {
+  const time = (v: string) => v.split('T')[1] ?? ''
+  if (start && !isValidTime(time(start))) return 'La hora de inicio está incompleta (HH:MM)'
+  if (end && !isValidTime(time(end))) return 'La hora de fin está incompleta (HH:MM)'
+  return null
+}

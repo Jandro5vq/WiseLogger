@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { isoToLocalInput } from '@/lib/utils'
 import { DateTimeInput } from '@/components/ui/date-time-input'
 import { useToast } from '@/components/ui/toast'
+import { incompleteTimeError } from '@/lib/time-mask'
 import { Play } from 'pixelarticons/react'
 
 interface Favorite {
@@ -17,7 +18,7 @@ interface NewTaskFormProps {
   entryId: string
   /** Calendar day (YYYY-MM-DD) this entry belongs to — always today on the dashboard. */
   entryDate: string
-  activeTaskId?: string // if set, it will be stopped first
+  activeTaskId?: string // if set, the server closes/splits it to make room
   /** Description of the active task — hides its quick-start chip while it runs */
   activeTaskDescription?: string
   /** ISO string — if provided, the new-task form opens with this as the default start time */
@@ -67,13 +68,9 @@ export function NewTaskForm({ entryId, entryDate, activeTaskId, activeTaskDescri
     setOpen(true)
   }
 
-  // One-tap start: stop the active task (if any) at now and start the favorite,
-  // same sequence as the resume action in the task list.
+  // One-tap start: the server closes the active task (if any) at now and starts the favorite.
   async function quickStart(fav: Favorite) {
     setQuickStarting(fav.description)
-    if (activeTaskId) {
-      await fetch(`/api/tasks/${activeTaskId}/stop`, { method: 'POST' })
-    }
     const res = await fetch(`/api/entries/${entryId}/tasks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -97,18 +94,13 @@ export function NewTaskForm({ entryId, entryDate, activeTaskId, activeTaskDescri
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!description.trim()) return
+    const timeError = incompleteTimeError(startTime, endTime)
+    if (timeError) { setError(timeError); return }
     setError('')
     setLoading(true)
 
-    // Stop currently active task first, ending it at the new task's start time
-    if (activeTaskId) {
-      const stopBody = startTime ? { endTime: new Date(startTime).toISOString() } : undefined
-      await fetch(`/api/tasks/${activeTaskId}/stop`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: stopBody ? JSON.stringify(stopBody) : undefined,
-      })
-    }
+    // No separate stop call: the server closes, splits or replaces the active task
+    // itself so the new task always fits (and fails atomically if it can't).
 
     const tags = tagsInput.split(',').map((t) => t.trim()).filter(Boolean)
     const body: Record<string, unknown> = { description: description.trim(), tags }
@@ -235,7 +227,7 @@ export function NewTaskForm({ entryId, entryDate, activeTaskId, activeTaskDescri
 
       {activeTaskId && (
         <p className="text-xs text-amber-600 dark:text-amber-400">
-          La tarea activa se detendrá al iniciar esta.
+          La tarea activa se detendrá o se recortará para dejar sitio a esta.
         </p>
       )}
 

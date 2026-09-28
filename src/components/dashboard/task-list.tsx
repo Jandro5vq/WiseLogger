@@ -336,10 +336,8 @@ function TaskGroup({
 
   async function resume(e: React.MouseEvent) {
     e.stopPropagation()
-    if (activeTaskId) {
-      await fetch(`/api/tasks/${activeTaskId}/stop`, { method: 'POST' })
-    }
-    await fetch(`/api/entries/${entryId}/tasks`, {
+    // The server closes the active task (if any) at the new start itself.
+    const res = await fetch(`/api/entries/${entryId}/tasks`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -349,6 +347,10 @@ function TaskGroup({
         startTime: new Date().toISOString(),
       }),
     })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      toast.error(data.error || 'No se pudo reanudar la tarea')
+    }
     startTransition(() => router.refresh())
   }
 

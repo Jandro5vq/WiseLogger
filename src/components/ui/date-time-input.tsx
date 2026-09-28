@@ -47,7 +47,9 @@ export function DateTimeInput({ value, onChange, contextDate, className = '', re
     if (raw === null) return // reject the keystroke — controlled value snaps back
 
     if (error && isValidTime(raw)) setError(false)
-    onChange(`${date || contextDate}T${raw}`)
+    // An emptied field is "no time" — emitting a bare "YYYY-MM-DDT" would look like a
+    // value to callers and parse as an Invalid Date.
+    onChange(raw ? `${date || contextDate}T${raw}` : '')
   }
 
   function handleTimeBlur(raw: string) {

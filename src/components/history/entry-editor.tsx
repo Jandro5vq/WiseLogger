@@ -9,6 +9,7 @@ import { TaskList } from '@/components/dashboard/task-list'
 import { DateTimeInput } from '@/components/ui/date-time-input'
 import { GapsAlert } from '@/components/ui/gaps-alert'
 import { useToast } from '@/components/ui/toast'
+import { incompleteTimeError } from '@/lib/time-mask'
 import { Note } from 'pixelarticons/react'
 
 function useAdjustPref(key: string): [boolean, (v: boolean) => void] {
@@ -64,6 +65,8 @@ function AddTaskForm({ entryId, date, onAdded }: { entryId: string; date: string
   async function save(e: React.FormEvent) {
     e.preventDefault()
     if (!description.trim()) return
+    const timeError = incompleteTimeError(startTime, endTime)
+    if (timeError) { setError(timeError); return }
     if (!isToday && !endTime) {
       setError('Indica una hora de fin: un día pasado no puede quedar con una tarea en curso')
       return
@@ -87,6 +90,10 @@ function AddTaskForm({ entryId, date, onAdded }: { entryId: string; date: string
     const data = await res.json()
     setSaving(false)
     if (!res.ok) { setError(data.error ?? 'Failed'); return }
+    const deleted: string[] = data.deletedDescriptions ?? []
+    for (const desc of Array.from(new Set(deleted))) {
+      toast.info(`«${desc}» fue eliminada al quedar completamente cubierta`)
+    }
     setDescription('')
     setTagsInput('')
     setNotes('')
