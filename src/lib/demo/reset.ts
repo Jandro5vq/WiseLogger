@@ -165,9 +165,13 @@ const ENTRY_NOTES = [
   'Cerré 3 bugs en producción — bien',
 ]
 
-function workdaysBack(count: number): string[] {
+function utcDateString(d: Date): string {
+  return d.toISOString().slice(0, 10)
+}
+
+function workdaysBack(count: number, now: Date): string[] {
   const result: string[] = []
-  const cursor = new Date()
+  const cursor = new Date(now)
   cursor.setUTCHours(0, 0, 0, 0)
 
   while (result.length < count) {
@@ -184,7 +188,14 @@ function workdaysBack(count: number): string[] {
   return result
 }
 
-export function resetDemoData(userId: string): void {
+/**
+ * Wipes and re-seeds the demo user's data: the last 10 workdays, all closed
+ * except today (when today is a workday), which is left open — tasks only up
+ * to `now`, with the one covering `now` still running.
+ */
+export function resetDemoData(userId: string, now: Date = new Date()): void {
+  const today = utcDateString(now)
+
   const doReset = (sqlite as unknown as { transaction: (fn: () => void) => () => void }).transaction(() => {
     // Phase 1: delete all existing data
     db.delete(workScheduleRules).where(eq(workScheduleRules.userId, userId)).run()
@@ -206,7 +217,7 @@ export function resetDemoData(userId: string): void {
     ]).run()
 
     // Phase 3: re-seed entries, tasks, and breaks
-    const workdays = workdaysBack(10)
+    const workdays = workdaysBack(10, now)
 
     workdays.forEach((dateStr, dayIndex) => {
       const isoDate = new Date(dateStr + 'T00:00:00.000Z')
@@ -218,17 +229,26 @@ export function resetDemoData(userId: string): void {
       const entryStart = new Date(dateStr + 'T08:45:00.000Z')
 
       const theme = THEMES[dayIndex % 5]
-      const builtTasks = buildTasks(theme, entryStart, expectedMinutes, dateStr)
-      const entryEnd = builtTasks[builtTasks.length - 1].endTime
+      const plannedTasks = buildTasks(theme, entryStart, expectedMinutes, dateStr)
+      const isToday = dateStr === today
+
+      // Today is still in progress: drop what hasn't started yet and leave the
+      // task that covers `now` running. (Inside a break nothing is running.)
+      const builtTasks: Array<Omit<BuiltTask, 'endTime'> & { endTime: Date | null }> = isToday
+        ? plannedTasks
+            .filter((t) => t.startTime < now)
+            .map((t) => (t.endTime > now ? { ...t, endTime: null } : t))
+        : plannedTasks
+      const entryEnd = isToday ? null : plannedTasks[plannedTasks.length - 1].endTime
 
       db.insert(entries).values({
         id: entryId,
         userId,
         date: dateStr,
         startTime: entryStart.toISOString(),
-        endTime: entryEnd.toISOString(),
+        endTime: entryEnd ? entryEnd.toISOString() : null,
         expectedMinutes,
-        notes: ENTRY_NOTES[dayIndex] ?? null,
+        notes: isToday ? null : (ENTRY_NOTES[dayIndex] ?? null),
       }).run()
 
       for (const t of builtTasks) {
@@ -237,7 +257,7 @@ export function resetDemoData(userId: string): void {
           entryId,
           userId,
           startTime: t.startTime.toISOString(),
-          endTime: t.endTime.toISOString(),
+          endTime: t.endTime ? t.endTime.toISOString() : null,
           description: t.description,
           tags: JSON.stringify(t.tags),
         }).run()

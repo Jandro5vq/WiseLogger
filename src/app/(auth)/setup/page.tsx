@@ -15,7 +15,7 @@ function SetupForm() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (password !== confirm) {
-      setError('Passwords do not match')
+      setError('Las contraseñas no coinciden')
       return
     }
     setError('')
@@ -31,7 +31,7 @@ function SetupForm() {
     setLoading(false)
 
     if (!res.ok) {
-      setError(data.error || 'Setup failed')
+      setError(data.error || 'No se pudo guardar la contraseña')
       return
     }
 
@@ -43,28 +43,31 @@ function SetupForm() {
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-primary">WiseLogger</h1>
-          <p className="text-muted-foreground mt-1">Set your admin password to continue</p>
+          <p className="text-muted-foreground mt-1">Elige una contraseña nueva para continuar</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="password" className="block text-sm font-medium mb-1">
-              New Password
+              Contraseña nueva
             </label>
             <input
               id="password"
               type="password"
               required
               minLength={8}
+              autoComplete="new-password"
+              aria-describedby="password-hint"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus:outline-none focus:ring-2 focus:ring-ring"
             />
+            <p id="password-hint" className="mt-1 text-xs text-muted-foreground">Mínimo 8 caracteres, con mayúscula, minúscula y número.</p>
           </div>
 
           <div>
             <label htmlFor="confirm" className="block text-sm font-medium mb-1">
-              Confirm Password
+              Repite la contraseña
             </label>
             <input
               id="confirm"
@@ -83,7 +86,7 @@ function SetupForm() {
             disabled={loading}
             className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
-            {loading ? 'Setting password…' : 'Set Password & Continue'}
+            {loading ? 'Guardando…' : 'Guardar y continuar'}
           </button>
         </form>
       </div>

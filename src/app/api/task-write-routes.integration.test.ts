@@ -76,23 +76,35 @@ function assertEntryInvariants(entryId: string) {
   }
 }
 
-describe('POST /api/entries/[id]/tasks — backdated active task guard', () => {
-  it('rejects a new active task starting at/before the current active task start', async () => {
-    const { id: userId } = makeUser()
-    const entry = createEntry({ id: uuidv4(), userId, date: '2026-04-06', expectedMinutes: 480 })
-    const active = createTask({
-      id: uuidv4(), entryId: entry.id, userId,
-      startTime: '2026-04-06T10:00:00.000Z', description: 'Running', tags: '[]',
-    })
+describe('POST /api/entries/[id]/tasks — backdated active task', () => {
+  it('a new active task starting before the current active one replaces it', async () => {
+    vi.useFakeTimers()
+    vi.setSystemTime(new Date('2026-04-06T11:00:00.000Z'))
+    try {
+      const { id: userId } = makeUser()
+      const entry = createEntry({ id: uuidv4(), userId, date: '2026-04-06', expectedMinutes: 480 })
+      const active = createTask({
+        id: uuidv4(), entryId: entry.id, userId,
+        startTime: '2026-04-06T10:00:00.000Z', description: 'Running', tags: '[]',
+      })
 
-    const res = await createTaskRoute(
-      jsonRequest({ description: 'Backdated', startTime: '2026-04-06T09:00:00.000Z' }),
-      { params: { id: entry.id } }
-    )
-    expect(res.status).toBe(400)
+      const res = await createTaskRoute(
+        jsonRequest({ description: 'Backdated', startTime: '2026-04-06T09:00:00.000Z' }),
+        { params: { id: entry.id } }
+      )
+      expect(res.status).toBe(201)
+      const body = await res.json()
+      expect(body.deletedDescriptions).toEqual(['Running'])
+      expect(getTaskById(active.id)).toBeUndefined()
 
-    // The active task was not corrupted with an inverted endTime.
-    expect(getTaskById(active.id)!.endTime).toBeNull()
+      const tasks = listTasksForEntry(entry.id)
+      expect(tasks).toHaveLength(1)
+      expect(tasks[0].startTime).toBe('2026-04-06T09:00:00.000Z')
+      expect(tasks[0].endTime).toBeNull()
+      assertEntryInvariants(entry.id)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it('still closes the active task for a later-starting new active task', async () => {
@@ -261,7 +273,7 @@ describe('POST /api/entries/[id]/tasks — active task carving (exact reported b
     }
   })
 
-  it('closes the active task when it started before the new completed span', async () => {
+  it('splits the active task around a completed span inserted in its middle', async () => {
     vi.useFakeTimers()
     vi.setSystemTime(new Date('2026-05-03T12:00:00.000Z'))
     try {
@@ -279,6 +291,11 @@ describe('POST /api/entries/[id]/tasks — active task carving (exact reported b
       expect(res.status).toBe(201)
       assertEntryInvariants(entry.id)
       expect(getTaskById(active.id)!.endTime).toBe('2026-05-03T10:00:00.000Z')
+      // …and keeps running after the inserted block.
+      const running = listTasksForEntry(entry.id).filter((t) => !t.endTime)
+      expect(running).toHaveLength(1)
+      expect(running[0].description).toBe('Running')
+      expect(running[0].startTime).toBe('2026-05-03T11:00:00.000Z')
     } finally {
       vi.useRealTimers()
     }

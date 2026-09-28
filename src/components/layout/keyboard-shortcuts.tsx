@@ -21,8 +21,11 @@ export function KeyboardShortcuts() {
 
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
-      const tag = (document.activeElement as HTMLElement)?.tagName
+      const active = document.activeElement as HTMLElement | null
+      const tag = active?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      // Rich-text editors (TipTap daily notes) are contenteditable divs, not inputs.
+      if (active?.isContentEditable) return
       if (e.metaKey || e.ctrlKey || e.altKey) return
 
       // '?' (Shift+/) toggles the shortcuts overlay; Escape closes it.

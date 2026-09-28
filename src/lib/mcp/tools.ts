@@ -1,15 +1,16 @@
 import { z } from 'zod'
 import { v4 as uuidv4 } from 'uuid'
 import { getEntryByDate, getEntryById, updateEntry, listEntries } from '@/lib/db/queries/entries'
-import { getActiveTask, createTask, updateTask, deleteTask, getTaskById, listTasksForEntry } from '@/lib/db/queries/tasks'
+import { getActiveTask, updateTask, deleteTask, getTaskById, listTasksForEntry } from '@/lib/db/queries/tasks'
 import { getEntryBreakById, createEntryBreak, updateEntryBreak, deleteEntryBreak, getEntryBreaks } from '@/lib/db/queries/entry-breaks'
 import { autoCreateEntry, todayDateString } from '@/lib/business/tasks'
 import { getUserById } from '@/lib/db/queries/users'
 import { computeBalance, computeEntryWorkedMinutes } from '@/lib/business/balance'
 import { stopTask } from '@/lib/business/stop'
-import { splitTaskAcrossMidnights, splitEntryTasksAcrossMidnights, mergeContiguousSpans } from '@/lib/business/spans'
+import { splitEntryTasksAcrossMidnights, mergeContiguousSpans } from '@/lib/business/spans'
 import { buildEntryIntervals, detectOverlap, breakToInterval, toBreakStartIso } from '@/lib/business/breaks'
 import { parseTaskTags } from '@/types/db'
+import { createTaskCarving } from '@/lib/business/create-task'
 import { formatMinutes } from '@/lib/utils'
 
 function getUserToday(userId: string): string {
@@ -129,7 +130,9 @@ export const mcpTools: McpTool[] = [
     description:
       'Añade una tarea a la jornada. Por defecto usa la fecha de hoy. ' +
       'Pasa una fecha para añadir tareas a días pasados — el registro de jornada se crea automáticamente si no existe. ' +
-      'Proporciona siempre start_time y end_time al importar datos históricos.',
+      'Proporciona siempre start_time y end_time al importar datos históricos. ' +
+      'La nueva tarea siempre prevalece: recorta, parte o elimina las tareas que solape (incluida la activa) ' +
+      'y se divide automáticamente alrededor de las pausas.',
     schema: z.object({
       description: z.string().describe('Descripción de la tarea'),
       tags: z.array(z.string()).optional().describe('Lista opcional de etiquetas'),
@@ -147,42 +150,19 @@ export const mcpTools: McpTool[] = [
       }
 
       const targetDate = date ?? getUserToday(userId)
-      const isToday = targetDate === getUserToday(userId)
-
-      if (isToday && !end_time) {
-        const active = getActiveTask(userId)
-        if (active) return { error: 'Ya hay una tarea activa. Detenerla primero o proporcionar end_time.' }
-      }
-
       const entry = autoCreateEntry(userId, targetDate)
-      const tStart = new Date(start_time ?? new Date().toISOString()).getTime()
-
-      if (end_time) {
-        const tEnd = new Date(end_time).getTime()
-        const existing = buildEntryIntervals(entry.id, targetDate, { includeActive: true })
-        if (detectOverlap(existing, { start: tStart, end: tEnd })) {
-          return { error: 'El intervalo se solapa con una tarea o pausa existente' }
-        }
-      }
-
-      const task = createTask({
-        id: uuidv4(),
-        entryId: entry.id,
+      const result = createTaskCarving({
+        entry,
         userId,
-        startTime: start_time ?? new Date().toISOString(),
-        endTime: end_time,
+        timezone: getUserById(userId)?.timezone ?? 'UTC',
         description,
-        tags: JSON.stringify(tags ?? []),
+        tags: tags ?? [],
+        startIso: start_time ?? new Date().toISOString(),
+        endIso: end_time,
       })
+      if (!result.ok) return { error: result.error }
 
-      // Keep the day-split invariant: a historical task that crosses local
-      // midnight gets one segment per calendar day (no-op otherwise).
-      if (end_time) {
-        const tz = getUserById(userId)?.timezone ?? 'UTC'
-        splitTaskAcrossMidnights(task.id, userId, tz)
-      }
-
-      return parseTaskTags(getTaskById(task.id) ?? task)
+      return { ...parseTaskTags(result.task), deletedDescriptions: result.deletedDescriptions }
     },
   },
 

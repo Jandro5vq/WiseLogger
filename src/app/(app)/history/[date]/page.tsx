@@ -30,7 +30,7 @@ export default async function HistoryDatePage({ params }: { params: { date: stri
     <div className="max-w-4xl mx-auto space-y-4">
       <div className="flex items-center gap-3 mb-6">
         <Link href="/history" className="text-muted-foreground hover:text-foreground transition-colors">
-          ← Back
+          ← Historial
         </Link>
         <h1 className="text-2xl font-bold">{date}</h1>
       </div>

@@ -101,7 +101,7 @@ function BreakForm({
           type="text"
           value={label}
           onChange={(e) => setLabel(e.target.value)}
-          placeholder="e.g. Lunch"
+          placeholder="p. ej. Comida"
           className="w-full rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
         />
       </div>
@@ -290,6 +290,7 @@ export function BreaksPanel({
                 value={addStart}
                 onChange={setAddStart}
                 required
+                showNow
                 className="rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>

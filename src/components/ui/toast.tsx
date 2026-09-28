@@ -68,44 +68,50 @@ export function Toaster({ children }: { children: React.ReactNode }) {
   return (
     <ToastContext.Provider value={ctx}>
       {children}
-      <div
-        role="status"
-        aria-live="polite"
-        className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none"
-      >
-        {toasts.map((t) => (
-          <div
-            key={t.id}
-            className={`pointer-events-auto flex items-center gap-2 rounded-md px-4 py-2 text-sm shadow-lg transition-opacity ${
-              t.type === 'error'
-                ? 'bg-red-600 text-white'
-                : t.type === 'success'
-                  ? 'bg-green-600 text-white'
-                  : 'bg-card text-foreground border border-border'
-            }`}
-          >
-            <span>{t.message}</span>
-            {t.action && (
-              <button
-                onClick={() => { t.action!.onClick(); dismiss(t.id) }}
-                className="shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold underline underline-offset-2 hover:opacity-80"
-              >
-                {t.action.label}
-              </button>
-            )}
-            <button
-              onClick={() => dismiss(t.id)}
-              aria-label="Cerrar notificación"
-              className="shrink-0 -mr-1 rounded p-0.5 opacity-70 hover:opacity-100"
-            >
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          </div>
-        ))}
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 pointer-events-none">
+        {/* Errors interrupt screen readers; everything else waits its turn. */}
+        <div role="alert" aria-live="assertive" className="flex flex-col gap-2">
+          {toasts.filter((t) => t.type === 'error').map(renderToast)}
+        </div>
+        <div role="status" aria-live="polite" className="flex flex-col gap-2">
+          {toasts.filter((t) => t.type !== 'error').map(renderToast)}
+        </div>
       </div>
     </ToastContext.Provider>
   )
+
+  function renderToast(t: Toast) {
+    return (
+      <div
+        key={t.id}
+        className={`pointer-events-auto flex items-center gap-2 rounded-md px-4 py-2 text-sm shadow-lg transition-opacity ${
+          t.type === 'error'
+            ? 'bg-red-600 text-white'
+            : t.type === 'success'
+              ? 'bg-green-600 text-white'
+              : 'bg-card text-foreground border border-border'
+        }`}
+      >
+        <span>{t.message}</span>
+        {t.action && (
+          <button
+            onClick={() => { t.action!.onClick(); dismiss(t.id) }}
+            className="shrink-0 rounded px-1.5 py-0.5 text-xs font-semibold underline underline-offset-2 hover:opacity-80"
+          >
+            {t.action.label}
+          </button>
+        )}
+        <button
+          onClick={() => dismiss(t.id)}
+          aria-label="Cerrar notificación"
+          className="shrink-0 -mr-1 rounded p-0.5 opacity-70 hover:opacity-100"
+        >
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round">
+            <line x1="18" y1="6" x2="6" y2="18" />
+            <line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+    )
+  }
 }
