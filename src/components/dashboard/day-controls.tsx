@@ -4,6 +4,7 @@ import { useState, useEffect, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
 import { isoToLocalInput } from '@/lib/utils'
 import { DateTimeInput } from '@/components/ui/date-time-input'
+import { useToast } from '@/components/ui/toast'
 import { PenSquare } from 'pixelarticons/react'
 
 interface DayControlsProps {
@@ -46,6 +47,7 @@ export function DayControls({
   activeTaskId,
 }: DayControlsProps) {
   const router = useRouter()
+  const toast = useToast()
   const [, startTransition] = useTransition()
 
   const [editingStart, setEditingStart] = useState(false)
@@ -63,6 +65,14 @@ export function DayControls({
   const [adjustFirst, setAdjustFirst] = useAdjustPref('wl:adjustFirstTask')
   const [adjustLast, setAdjustLast] = useAdjustPref('wl:adjustLastTask')
 
+  // "C" shortcut opens the close-day confirmation.
+  useEffect(() => {
+    if (isClosed) return
+    function handleCloseDay() { setConfirmClose(true) }
+    window.addEventListener('wl:close-day', handleCloseDay)
+    return () => window.removeEventListener('wl:close-day', handleCloseDay)
+  }, [isClosed])
+
   function openStartEdit() {
     setStartInput(isoToLocalInput(entryStartTime))
     setEditingStart(true)
@@ -77,7 +87,7 @@ export function DayControls({
     e.preventDefault()
     if (!startInput) return
     setSavingStart(true)
-    await fetch(`/api/entries/${entryId}`, {
+    const res = await fetch(`/api/entries/${entryId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -86,6 +96,11 @@ export function DayControls({
       }),
     })
     setSavingStart(false)
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      toast.error(data.error ?? 'No se pudo guardar la hora de inicio')
+      return
+    }
     setEditingStart(false)
     startTransition(() => router.refresh())
   }
@@ -94,7 +109,7 @@ export function DayControls({
     e.preventDefault()
     if (!endInput) return
     setSavingEnd(true)
-    await fetch(`/api/entries/${entryId}`, {
+    const res = await fetch(`/api/entries/${entryId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -103,6 +118,11 @@ export function DayControls({
       }),
     })
     setSavingEnd(false)
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      toast.error(data.error ?? 'No se pudo guardar la hora de fin')
+      return
+    }
     setEditingEnd(false)
     startTransition(() => router.refresh())
   }
@@ -111,14 +131,7 @@ export function DayControls({
     setClosingDay(true)
     setCloseError('')
 
-    if (activeTaskId) {
-      await fetch(`/api/tasks/${activeTaskId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ endTime: expectedEndTime }),
-      })
-    }
-
+    // The server stops any running task at the close time (now).
     const res = await fetch('/api/entries/today/close', { method: 'POST' })
     setClosingDay(false)
 
@@ -301,7 +314,9 @@ export function DayControls({
           confirmClose ? (
             <div className="flex flex-col items-end gap-1">
               <div className="flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">¿Cerrar jornada?</span>
+                <span className="text-xs text-muted-foreground">
+                  {activeTaskId ? '¿Cerrar jornada? La tarea activa se detendrá ahora.' : '¿Cerrar jornada?'}
+                </span>
                 <button
                   onClick={handleCloseDay}
                   disabled={closingDay}
@@ -325,7 +340,7 @@ export function DayControls({
               onClick={() => setConfirmClose(true)}
               className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
             >
-              Fin de día
+              Cerrar jornada <span className="opacity-60">(C)</span>
             </button>
           )
         )}

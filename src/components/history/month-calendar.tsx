@@ -20,14 +20,14 @@ function cellColor(day: DaySummary): string {
   return 'bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200'
 }
 
-const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+const WEEKDAYS = ['L', 'M', 'X', 'J', 'V', 'S', 'D']
 
 export function MonthCalendar({ year, month, days, onNavigate }: MonthCalendarProps) {
   const dayMap = new Map(days.map((d) => [d.date, d]))
   const firstDay = new Date(year, month - 1, 1)
   const startOffset = (firstDay.getDay() + 6) % 7
   const daysInMonth = new Date(year, month, 0).getDate()
-  const monthName = firstDay.toLocaleString('default', { month: 'long', year: 'numeric' })
+  const monthName = firstDay.toLocaleString('es-ES', { month: 'long', year: 'numeric' })
 
   const cells: Array<{ date: string | null; day: number | null }> = []
   for (let i = 0; i < startOffset; i++) cells.push({ date: null, day: null })
@@ -41,6 +41,7 @@ export function MonthCalendar({ year, month, days, onNavigate }: MonthCalendarPr
       <div className="flex items-center justify-between mb-4">
         <button
           onClick={() => onNavigate(month === 1 ? year - 1 : year, month === 1 ? 12 : month - 1)}
+          aria-label="Mes anterior"
           className="rounded-md p-2 hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
         >
           <ArrowLeftBox width={24} height={24} />
@@ -48,6 +49,7 @@ export function MonthCalendar({ year, month, days, onNavigate }: MonthCalendarPr
         <h2 className="font-semibold capitalize">{monthName}</h2>
         <button
           onClick={() => onNavigate(month === 12 ? year + 1 : year, month === 12 ? 1 : month + 1)}
+          aria-label="Mes siguiente"
           className="rounded-md p-2 hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
         >
           <ArrowRightBox width={24} height={24} />
@@ -90,15 +92,15 @@ export function MonthCalendar({ year, month, days, onNavigate }: MonthCalendarPr
       <div className="flex items-center gap-3 mt-4 text-xs text-muted-foreground">
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded bg-green-100 dark:bg-green-900" />
-          <span>≥ target</span>
+          <span>Objetivo cumplido</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded bg-yellow-100 dark:bg-yellow-900" />
-          <span>partial</span>
+          <span>Parcial (≥ 50 %)</span>
         </div>
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded bg-red-100 dark:bg-red-900" />
-          <span>low</span>
+          <span>Bajo (&lt; 50 %)</span>
         </div>
       </div>
     </div>

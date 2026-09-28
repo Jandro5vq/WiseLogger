@@ -39,7 +39,7 @@ function RegisterForm() {
     setLoading(false)
 
     if (!res.ok) {
-      setError(data.error || 'Registration failed')
+      setError(data.error || 'No se pudo crear la cuenta')
       return
     }
 
@@ -51,13 +51,15 @@ function RegisterForm() {
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-primary">WiseLogger</h1>
-          <p className="text-muted-foreground mt-1">Create your account</p>
+          <p className="text-muted-foreground mt-1">Crea tu cuenta</p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium mb-1">Username</label>
+            <label htmlFor="username" className="block text-sm font-medium mb-1">Usuario</label>
             <input
+              id="username"
+              autoComplete="username"
               type="text"
               required
               value={form.username}
@@ -67,8 +69,10 @@ function RegisterForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Email</label>
+            <label htmlFor="email" className="block text-sm font-medium mb-1">Email</label>
             <input
+              id="email"
+              autoComplete="email"
               type="email"
               required
               value={form.email}
@@ -78,8 +82,11 @@ function RegisterForm() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Password</label>
+            <label htmlFor="password" className="block text-sm font-medium mb-1">Contraseña</label>
             <input
+              id="password"
+              autoComplete="new-password"
+              aria-describedby="password-hint"
               type="password"
               required
               minLength={8}
@@ -87,6 +94,7 @@ function RegisterForm() {
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
+            <p id="password-hint" className="mt-1 text-xs text-muted-foreground">Mínimo 8 caracteres.</p>
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
@@ -96,7 +104,7 @@ function RegisterForm() {
             disabled={loading}
             className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
-            {loading ? 'Creating account…' : 'Create Account'}
+            {loading ? 'Creando cuenta…' : 'Crear cuenta'}
           </button>
         </form>
       </div>

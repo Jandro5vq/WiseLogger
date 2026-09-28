@@ -117,7 +117,7 @@ export function NewTaskForm({ entryId, entryDate, activeTaskId, activeTaskDescri
     setLoading(false)
 
     if (!res.ok) {
-      setError(data.error || 'Failed to add task')
+      setError(data.error || 'No se pudo añadir la tarea')
       return
     }
 

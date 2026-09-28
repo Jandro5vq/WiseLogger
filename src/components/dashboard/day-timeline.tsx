@@ -129,11 +129,11 @@ export function DayTimeline({ tasks, breaks = [], entryDate }: DayTimelineProps)
     <div data-tour="timeline" className="rounded-xl border border-border bg-card overflow-hidden">
       {/* header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
-        <h2 className="text-sm font-semibold tracking-wide">Timeline</h2>
+        <h2 className="text-sm font-semibold tracking-wide">Línea de tiempo</h2>
         <span className="text-xs text-muted-foreground font-mono">
           {fmtHHMM(spanStart)} – {fmtHHMM(spanEnd)}
           {hasActive && (
-            <span className="ml-2 text-primary font-medium animate-pulse">● live</span>
+            <span className="ml-2 text-primary font-medium motion-safe:animate-pulse">● en curso</span>
           )}
         </span>
       </div>

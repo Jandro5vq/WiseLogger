@@ -29,7 +29,8 @@ function CopyButton({ text, title = 'Copiar' }: { text: string; title?: string }
     <button
       onClick={copy}
       title={title}
-      className="shrink-0 opacity-0 group-hover/row:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
+      aria-label={title}
+      className="shrink-0 rounded p-1 -m-1 opacity-40 group-hover/row:opacity-100 focus-visible:opacity-100 transition-opacity text-muted-foreground hover:text-foreground"
     >
       {copied ? (
         <span className="text-[10px] text-green-600 dark:text-green-400 font-medium">✓</span>
@@ -361,6 +362,7 @@ export function WeekView() {
       <div data-tour="week-nav" className="flex items-center justify-between">
         <button
           onClick={() => navigate(-1)}
+          aria-label="Semana anterior"
           className="rounded-md p-2 hover:bg-accent transition-colors text-muted-foreground hover:text-foreground"
         >
           <ArrowLeftBox width={24} height={24} />
@@ -380,6 +382,7 @@ export function WeekView() {
         <button
           onClick={() => navigate(1)}
           disabled={isCurrentWeek}
+          aria-label="Semana siguiente"
           className="rounded-md p-2 hover:bg-accent transition-colors text-muted-foreground hover:text-foreground disabled:opacity-30 disabled:cursor-not-allowed"
         >
           <ArrowRightBox width={24} height={24} />

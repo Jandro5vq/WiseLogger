@@ -75,6 +75,23 @@
   body {
     @apply bg-background text-foreground;
   }
+  /* Keyboard focus is always visible. Inputs that draw their own focus:ring
+     keep it — their focus:outline-none utility wins on specificity. */
+  :focus-visible {
+    outline: 2px solid hsl(var(--ring));
+    outline-offset: 2px;
+  }
+}
+
+/* Honour the OS "reduce motion" setting everywhere, including inline
+   animations (timeline ping) and the tour spotlight pulse. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
 
 /* ── Onboarding tour ─────────────────────────────────────────────────────── */

@@ -117,7 +117,7 @@ export default function AdminInvitationsPage() {
             {invitations.map((inv) => (
               <tr key={inv.id} className="border-t border-border">
                 <td className="p-3 text-muted-foreground">{inv.email ?? '—'}</td>
-                <td className="p-3 text-xs">{new Date(inv.expiresAt).toLocaleDateString()}</td>
+                <td className="p-3 text-xs">{new Date(inv.expiresAt).toLocaleDateString('es-ES')}</td>
                 <td className="p-3">
                   {inv.usedAt ? (
                     <span className="text-xs text-muted-foreground">Used/revoked</span>

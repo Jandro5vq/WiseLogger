@@ -31,7 +31,7 @@ function LoginForm() {
         router.push(`/setup?userId=${data.userId}`)
         return
       }
-      setError(data.error || 'Login failed')
+      setError(data.error || 'No se pudo iniciar sesión')
       return
     }
 
@@ -49,13 +49,19 @@ function LoginForm() {
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-primary">WiseLogger</h1>
-          <p className="text-muted-foreground mt-1">Track your work time</p>
+          <p className="text-muted-foreground mt-1">Registro de jornada</p>
         </div>
+
+        {searchParams.get('registered') && (
+          <p role="status" className="rounded-md border border-border bg-card px-3 py-2 text-sm">
+            Cuenta creada. Inicia sesión para empezar.
+          </p>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div>
             <label htmlFor="username" className="block text-sm font-medium mb-1">
-              Username
+              Usuario
             </label>
             <input
               id="username"
@@ -70,7 +76,7 @@ function LoginForm() {
 
           <div>
             <label htmlFor="password" className="block text-sm font-medium mb-1">
-              Password
+              Contraseña
             </label>
             <div className="relative">
               <input
@@ -86,8 +92,7 @@ function LoginForm() {
                 type="button"
                 onClick={() => setShowPassword((v) => !v)}
                 className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground transition-colors"
-                tabIndex={-1}
-                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
               >
                 {showPassword ? (
                   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -112,7 +117,7 @@ function LoginForm() {
             disabled={loading}
             className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
           >
-            {loading ? 'Signing in…' : 'Sign in'}
+            {loading ? 'Entrando…' : 'Iniciar sesión'}
           </button>
         </form>
       </div>
