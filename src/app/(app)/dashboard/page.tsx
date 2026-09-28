@@ -11,6 +11,7 @@ import { DayControls } from '@/components/dashboard/day-controls'
 import { DayTimeline } from '@/components/dashboard/day-timeline'
 import { BreaksPanel } from '@/components/dashboard/breaks-panel'
 import { DailyNotes } from '@/components/dashboard/daily-notes'
+import { WorkdayClock } from '@/components/dashboard/workday-clock'
 import { GapsAlert } from '@/components/ui/gaps-alert'
 import { listEntries, listUnclosedEntriesBefore } from '@/lib/db/queries/entries'
 import { autoSplitActiveTask } from '@/lib/business/spans'
@@ -69,11 +70,23 @@ export default async function DashboardPage() {
   // Default start time for first task = entry start time; otherwise omit (defaults to now)
   const newTaskDefaultStart = allTasksSorted.length === 0 ? entryStartTime : undefined
 
+  // Earlier sessions of the running task today, so the timer can show the task's day total.
+  const activePriorMinutes = activeTask
+    ? sumWorkedMinutes(completedTasks.filter((t) => t.description === activeTask.description), breakIntervals)
+    : 0
+
+  const dateLabel = new Intl.DateTimeFormat('es-ES', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    timeZone: session.user.timezone,
+  }).format(new Date(`${today}T12:00:00Z`))
+
   return (
     <div className="max-w-6xl mx-auto space-y-4">
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-baseline justify-between gap-3 mb-2">
         <h1 className="text-2xl font-bold">Hoy</h1>
-        <span className="text-sm text-muted-foreground">{today}</span>
+        <span className="text-sm text-muted-foreground first-letter:uppercase">{dateLabel}</span>
       </div>
 
       <DayControls
@@ -86,47 +99,31 @@ export default async function DashboardPage() {
         activeTaskId={activeTask?.id}
       />
 
-      <TodayStats
-        entryStartTime={entryStartTime}
-        firstTaskStartTime={firstTaskStartTime}
-        completedTaskMinutes={completedMinutes}
-        expectedMinutes={entry.expectedMinutes}
-        totalBreakMinutes={totalBreakMinutes}
-        activeTaskStartTime={activeTask?.startTime}
-        breaks={breakIntervals}
-      />
-
-      {activeTask && (
-        <ActiveTaskTimer
-          key={activeTask.id}
-          task={activeTask}
-          loadedDate={today}
-          entryId={entry.id}
-          breaks={breakIntervals}
-          timezone={session.user.timezone}
-        />
-      )}
-
-      <DayTimeline tasks={allTasksSorted} breaks={breaks} entryDate={today} />
-
-      <BreaksPanel entryId={entry.id} entryDate={today} initialBreaks={breaks} />
-
+      {/* ── top row: what I'm doing now + day summary ── */}
       {isClosed && <GapsAlert tasks={allTasksSorted} breaks={breakIntervals} />}
-
-      <div data-tour="tasks-panel" className="rounded-lg border border-border bg-card">
-        <div className="border-b border-border px-4 py-3">
-          <h2 className="text-sm font-medium">Tareas</h2>
-        </div>
-        <div className="p-4 space-y-3">
-          <TaskList
-            tasks={allTasksSorted}
-            entryId={entry.id}
-            activeTaskId={activeTask?.id}
-            showBilledCheckbox
-            entryDate={today}
-            breaks={breakIntervals}
-          />
-          {!isClosed && (
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+        {!isClosed && (
+          <section aria-label="Tarea en curso" className="lg:col-span-2 min-w-0 space-y-3">
+            {activeTask ? (
+              <ActiveTaskTimer
+                key={activeTask.id}
+                task={activeTask}
+                loadedDate={today}
+                entryId={entry.id}
+                breaks={breakIntervals}
+                timezone={session.user.timezone}
+                priorMinutes={activePriorMinutes}
+                workdayClock={<WorkdayClock entryStartTime={entryStartTime} breaks={breakIntervals} />}
+              />
+            ) : (
+              <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-card px-4 py-3">
+                <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <span className="w-2 h-2 rounded-full bg-muted-foreground/40 shrink-0" />
+                  Sin tarea en curso
+                </span>
+                <WorkdayClock entryStartTime={entryStartTime} breaks={breakIntervals} />
+              </div>
+            )}
             <NewTaskForm
               entryId={entry.id}
               entryDate={today}
@@ -134,15 +131,55 @@ export default async function DashboardPage() {
               activeTaskDescription={activeTask?.description}
               defaultStartTime={newTaskDefaultStart}
             />
-          )}
+          </section>
+        )}
+
+        <div className={isClosed ? 'lg:col-span-3 min-w-0' : 'min-w-0'}>
+          <TodayStats
+            entryStartTime={entryStartTime}
+            firstTaskStartTime={firstTaskStartTime}
+            completedTaskMinutes={completedMinutes}
+            expectedMinutes={entry.expectedMinutes}
+            totalBreakMinutes={totalBreakMinutes}
+            activeTaskStartTime={activeTask?.startTime}
+            breaks={breakIntervals}
+            entryEndTime={entry.endTime ?? undefined}
+            stacked={!isClosed}
+          />
         </div>
       </div>
 
-      <DailyNotes
-        entryId={entry.id}
-        initialNotes={entry.notes ?? ''}
-        recentEntries={recentEntries.map((e) => ({ date: e.date, notes: e.notes ?? '' }))}
-      />
+      {/* ── timeline, full width ── */}
+      <DayTimeline tasks={allTasksSorted} breaks={breaks} entryDate={today} />
+
+      {/* ── the day's work + breaks and notes ── */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 items-start">
+        <div data-tour="tasks-panel" className="lg:col-span-2 min-w-0 rounded-lg border border-border bg-card">
+          <div className="border-b border-border px-4 py-3">
+            <h2 className="text-sm font-medium">Tareas</h2>
+          </div>
+          <div className="p-4">
+            <TaskList
+              tasks={allTasksSorted}
+              entryId={entry.id}
+              activeTaskId={activeTask?.id}
+              showBilledCheckbox
+              entryDate={today}
+              breaks={breakIntervals}
+            />
+          </div>
+        </div>
+
+        <div className="space-y-4 min-w-0">
+          <BreaksPanel entryId={entry.id} entryDate={today} initialBreaks={breaks} />
+
+          <DailyNotes
+            entryId={entry.id}
+            initialNotes={entry.notes ?? ''}
+            recentEntries={recentEntries.map((e) => ({ date: e.date, notes: e.notes ?? '' }))}
+          />
+        </div>
+      </div>
     </div>
   )
 }

@@ -183,14 +183,14 @@ export function DayControls({
               <button
                 onClick={openStartEdit}
                 className="font-mono font-medium tabular-nums hover:text-primary transition-colors"
-                title="Editar hora de inicio"
+                aria-label="Editar hora de inicio" title="Editar hora de inicio"
               >
                 {fmtHHMM(entryStartTime)}
               </button>
               <button
                 onClick={openStartEdit}
                 className="text-muted-foreground/60 hover:text-muted-foreground transition-colors p-0.5"
-                title="Editar hora de inicio"
+                aria-label="Editar hora de inicio" title="Editar hora de inicio"
               >
                 <PenSquare width={16} height={16} />
               </button>
@@ -236,14 +236,14 @@ export function DayControls({
                 <button
                   onClick={openEndEdit}
                   className="font-mono font-medium tabular-nums hover:text-primary transition-colors"
-                  title="Editar hora de fin"
+                  aria-label="Editar hora de fin" title="Editar hora de fin"
                 >
                   {fmtHHMM(entryEndTime)}
                 </button>
                 <button
                   onClick={openEndEdit}
                   className="text-muted-foreground/60 hover:text-muted-foreground transition-colors p-0.5"
-                  title="Editar hora de fin"
+                  aria-label="Editar hora de fin" title="Editar hora de fin"
                 >
                   <PenSquare width={16} height={16} />
                 </button>
@@ -293,14 +293,14 @@ export function DayControls({
             <button
               onClick={openStartEdit}
               className="font-mono font-medium tabular-nums hover:text-primary transition-colors"
-              title="Editar hora de inicio"
+              aria-label="Editar hora de inicio" title="Editar hora de inicio"
             >
               {fmtHHMM(entryStartTime)}
             </button>
             <button
               onClick={openStartEdit}
               className="text-muted-foreground/60 hover:text-muted-foreground transition-colors p-0.5"
-              title="Editar hora de inicio"
+              aria-label="Editar hora de inicio" title="Editar hora de inicio"
             >
               <PenSquare width={16} height={16} />
             </button>

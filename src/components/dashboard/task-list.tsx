@@ -277,6 +277,25 @@ function TaskGroup({
   const [notesValue, setNotesValue] = useState(() => segments.find((s) => s.notes)?.notes ?? '')
   const [savingNotes, setSavingNotes] = useState(false)
   const [addingSpan, setAddingSpan] = useState(false)
+  const rootRef = useRef<HTMLDivElement>(null)
+
+  // Clicking a span on the timeline opens it here for editing.
+  useEffect(() => {
+    function handleEdit(e: Event) {
+      const id = (e as CustomEvent<string>).detail
+      if (id === activeTaskId || !segments.some((s) => s.id === id)) return
+      setExpanded(true)
+      setEditingId(id)
+      rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+    window.addEventListener('wl:edit-task', handleEdit)
+    return () => window.removeEventListener('wl:edit-task', handleEdit)
+  }, [segments, activeTaskId])
+
+  function editSegment(id: string) {
+    setExpanded(true)
+    setEditingId(id)
+  }
 
   const allTags = Array.from(new Set(segments.flatMap((t) => t.tags)))
   const totalMinutes = sumWorkedMinutes(segments, breaks)
@@ -355,16 +374,27 @@ function TaskGroup({
   }
 
   return (
-    <div className={`rounded-lg border border-border bg-card overflow-hidden${isBilled ? ' opacity-60' : ''}`}>
-      {/* summary row — entire row is clickable to expand */}
+    <div ref={rootRef} className={`rounded-lg border border-border bg-card overflow-hidden${isBilled ? ' opacity-60' : ''}`}>
+      {/* summary row — entire row is clickable to show/hide its sessions */}
       <div
-        role={spans > 1 ? 'button' : undefined}
-        tabIndex={spans > 1 ? 0 : undefined}
-        onKeyDown={spans > 1 ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((v) => !v) } } : undefined}
+        role="button"
+        tabIndex={0}
+        aria-expanded={expanded}
+        aria-label={`${description}: ${expanded ? 'ocultar' : 'ver'} sesiones`}
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return
+          if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setExpanded((v) => !v) }
+        }}
         className="flex items-center justify-between px-3 py-2.5 gap-3 cursor-pointer hover:bg-accent/50 transition-colors"
-        onClick={() => { if (spans > 1) setExpanded((v) => !v) }}
+        onClick={() => setExpanded((v) => !v)}
       >
         <div className="flex items-center gap-2 flex-1 min-w-0">
+          <span
+            aria-hidden
+            className={`text-xs text-muted-foreground/60 shrink-0 transition-transform ${expanded ? 'rotate-90' : ''}`}
+          >
+            ›
+          </span>
           {onToggleBilled !== undefined && (
             <input
               type="checkbox"
@@ -384,11 +414,11 @@ function TaskGroup({
               <span className="text-xs font-semibold text-foreground tabular-nums">
                 {formatMinutes(totalMinutes)}
               </span>
-              {spans > 1 && (
-                <span className="text-xs text-muted-foreground">
-                  {spans} sesiones
-                </span>
-              )}
+              <span className="text-xs text-muted-foreground">
+                {spans > 1
+                  ? `${spans} sesiones`
+                  : `${fmtTime(segments[0].startTime)} → ${segments[0].endTime ? fmtTime(segments[0].endTime) : '…'}`}
+              </span>
             </div>
           </div>
         </div>
@@ -424,7 +454,7 @@ function TaskGroup({
           )}
           {spans === 1 && !isActive && (
             <button
-              onClick={(e) => { e.stopPropagation(); setEditingId(segments[0].id) }}
+              onClick={(e) => { e.stopPropagation(); editSegment(segments[0].id) }}
               className="text-muted-foreground hover:text-foreground transition-colors p-0.5"
               aria-label="Editar" title="Editar"
             >
@@ -453,13 +483,6 @@ function TaskGroup({
             notes={groupNotes}
             onDone={() => setAddingSpan(false)}
           />
-        </div>
-      )}
-
-      {/* inline edit for single-segment tasks */}
-      {editingId && segments[0].id === editingId && (
-        <div className="px-3 pb-3">
-          <EditTaskForm task={segments[0]} onDone={() => setEditingId(null)} siblingIds={segments.filter((s) => s.id !== segments[0].id).map((s) => s.id)} />
         </div>
       )}
 
@@ -526,6 +549,7 @@ function TaskGroup({
                       <button
                         onClick={() => setEditingId(seg.id)}
                         className="text-muted-foreground hover:text-foreground p-0.5"
+                        aria-label={`Editar sesión de ${fmtTime(seg.startTime)}`} title="Editar sesión"
                       >
                         <PenSquare width={14} height={14} />
                       </button>
@@ -533,6 +557,7 @@ function TaskGroup({
                     <button
                       onClick={() => deleteSegment(seg)}
                       className="text-muted-foreground hover:text-destructive p-0.5"
+                      aria-label={`Eliminar sesión de ${fmtTime(seg.startTime)}`} title="Eliminar sesión"
                     >
                       <TrashIcon size={14} />
                     </button>

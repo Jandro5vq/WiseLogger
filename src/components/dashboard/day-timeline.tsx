@@ -49,9 +49,10 @@ export function DayTimeline({ tasks, breaks = [], entryDate }: DayTimelineProps)
   useEffect(() => { setPalette(readTaskPalette()) }, [])
   const hasActive = tasks.some((t) => !t.endTime)
 
+  // Ticks every second while a task runs (bars grow); otherwise just keeps the
+  // "now" marker roughly in place.
   useEffect(() => {
-    if (!hasActive) return
-    const id = setInterval(() => setNow(Date.now()), 1000)
+    const id = setInterval(() => setNow(Date.now()), hasActive ? 1000 : 30_000)
     return () => clearInterval(id)
   }, [hasActive])
 
@@ -121,6 +122,19 @@ export function DayTimeline({ tasks, breaks = [], entryDate }: DayTimelineProps)
 
   function pct(ms: number) {
     return ((ms - spanStart) / totalSpan) * 100
+  }
+
+  const showNow = now >= spanStart && now <= spanEnd
+
+  // Bars open the matching editor: completed spans in the task list, breaks in the
+  // breaks panel, the running task in the timer card.
+  function openEditor(kind: 'task' | 'break', id: string) {
+    window.dispatchEvent(new CustomEvent(kind === 'task' ? 'wl:edit-task' : 'wl:edit-break', { detail: id }))
+  }
+  function barKeyDown(kind: 'task' | 'break', id: string) {
+    return (e: React.KeyboardEvent) => {
+      if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); openEditor(kind, id) }
+    }
   }
 
   const chartH = rows.length * ROW_H
@@ -204,8 +218,13 @@ export function DayTimeline({ tasks, breaks = [], entryDate }: DayTimelineProps)
                 return (
                   <div
                     key={task.id}
-                    title={`${task.description}\n${fmtHHMM(tStart)} → ${task.endTime ? fmtHHMM(tEnd) : '…'}  (${dur})`}
-                    className="absolute rounded flex items-center overflow-hidden cursor-default select-none"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openEditor('task', task.id)}
+                    onKeyDown={barKeyDown('task', task.id)}
+                    aria-label={`Editar ${task.description}, ${fmtHHMM(tStart)} a ${task.endTime ? fmtHHMM(tEnd) : 'ahora'}`}
+                    title={`${task.description}\n${fmtHHMM(tStart)} → ${task.endTime ? fmtHHMM(tEnd) : '…'}  (${dur})\nClic para editar`}
+                    className="absolute rounded flex items-center overflow-hidden cursor-pointer select-none hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
                     style={{
                       left:            `${left}%`,
                       width:           `${width}%`,
@@ -242,8 +261,13 @@ export function DayTimeline({ tasks, breaks = [], entryDate }: DayTimelineProps)
                 return (
                   <div
                     key={bi.id}
-                    title={`Pausa: ${fmtHHMM(bi.startMs)} → ${fmtHHMM(bi.endMs)}  (${bi.durationMinutes}m)${bi.label ? `\n${bi.label}` : ''}`}
-                    className="absolute rounded flex items-center overflow-hidden cursor-default select-none"
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => openEditor('break', bi.id)}
+                    onKeyDown={barKeyDown('break', bi.id)}
+                    aria-label={`Editar pausa de ${fmtHHMM(bi.startMs)} a ${fmtHHMM(bi.endMs)}`}
+                    title={`Pausa: ${fmtHHMM(bi.startMs)} → ${fmtHHMM(bi.endMs)}  (${bi.durationMinutes}m)${bi.label ? `\n${bi.label}` : ''}\nClic para editar`}
+                    className="absolute rounded flex items-center overflow-hidden cursor-pointer select-none hover:brightness-110 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring"
                     style={{
                       left:   `${left}%`,
                       width:  `${width}%`,
@@ -261,6 +285,16 @@ export function DayTimeline({ tasks, breaks = [], entryDate }: DayTimelineProps)
                   </div>
                 )
               })}
+
+              {/* now marker */}
+              {showNow && (
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute top-0 bottom-0 w-0.5 bg-destructive/70"
+                  style={{ left: `${pct(now)}%` }}
+                  title={`Ahora: ${fmtHHMM(now)}`}
+                />
+              )}
             </div>
 
             {/* time axis */}

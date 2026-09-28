@@ -12,6 +12,7 @@ export const SHORTCUTS: Shortcut[] = [
   { keys: ['N'], label: 'Nueva tarea' },
   { keys: ['S'], label: 'Detener la tarea activa' },
   { keys: ['C'], label: 'Cerrar la jornada' },
+  { keys: ['1', '…', '6'], label: 'Iniciar una tarea reciente' },
   { keys: ['?'], label: 'Mostrar atajos de teclado' },
 ]
 
@@ -52,6 +53,11 @@ export function KeyboardShortcuts() {
         case 'C':
           window.dispatchEvent(new CustomEvent('wl:close-day'))
           break
+        default:
+          // 1–6 start the matching quick-start chip on the dashboard.
+          if (/^[1-6]$/.test(e.key)) {
+            window.dispatchEvent(new CustomEvent('wl:quick-start', { detail: Number(e.key) - 1 }))
+          }
       }
     }
 
