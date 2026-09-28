@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useToast } from '@/components/ui/toast'
 import { useAutoRefresh } from '@/lib/use-auto-refresh'
-import { formatMinutes, localDateString } from '@/lib/utils'
+import { formatMinutes, localDateString, periodBounds, type Period } from '@/lib/utils'
 import { getJson } from '@/lib/fetcher'
 import { HoursBarChart } from '@/components/stats/hours-bar-chart'
 import { BalanceLineChart } from '@/components/stats/balance-line-chart'
@@ -13,7 +13,6 @@ import { WeekdayPatternChart } from '@/components/stats/weekday-pattern-chart'
 import { DayDetailDrawer } from '@/components/stats/day-detail-drawer'
 import type { DaySummary } from '@/lib/business/balance'
 
-type Period = 'week' | 'month' | 'year'
 type HeatmapPeriod = '3m' | '6m' | '1a'
 
 interface SummaryData {
@@ -24,22 +23,6 @@ interface SummaryData {
 }
 
 const HEATMAP_WEEKS: Record<HeatmapPeriod, number> = { '3m': 13, '6m': 26, '1a': 52 }
-
-function periodBounds(period: Period): { from: string; to: string } {
-  const today = new Date()
-  const to = localDateString(today)
-  if (period === 'week') {
-    const from = new Date(today)
-    from.setDate(today.getDate() - 6)
-    return { from: localDateString(from), to }
-  }
-  if (period === 'month') {
-    const from = new Date(today.getFullYear(), today.getMonth(), 1)
-    return { from: localDateString(from), to }
-  }
-  const from = new Date(today.getFullYear(), 0, 1)
-  return { from: localDateString(from), to }
-}
 
 function heatmapFromDate(weeks: number): string {
   const d = new Date()

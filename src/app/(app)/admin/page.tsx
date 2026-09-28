@@ -30,6 +30,15 @@ export default async function AdminPage() {
           <h2 className="font-semibold">Invitations</h2>
           <p className="text-sm text-muted-foreground mt-1">Create and manage invite links</p>
         </Link>
+
+        <Link
+          href="/admin/activity"
+          className="rounded-lg border border-border bg-card p-6 hover:bg-accent transition-colors"
+        >
+          <div className="text-2xl mb-2">📊</div>
+          <h2 className="font-semibold">Actividad</h2>
+          <p className="text-sm text-muted-foreground mt-1">Uso general de la aplicación</p>
+        </Link>
       </div>
     </div>
   )
