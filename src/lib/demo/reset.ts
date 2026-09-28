@@ -191,7 +191,7 @@ function workdaysBack(count: number, now: Date): string[] {
 /**
  * Wipes and re-seeds the demo user's data: the last 10 workdays, all closed
  * except today (when today is a workday), which is left open — tasks only up
- * to `now`, with the one covering `now` still running.
+ * to `now`, with the one covering `now` (or, after hours, the last one) still running.
  */
 export function resetDemoData(userId: string, now: Date = new Date()): void {
   const today = utcDateString(now)
@@ -234,12 +234,15 @@ export function resetDemoData(userId: string, now: Date = new Date()): void {
 
       // Today is still in progress: drop what hasn't started yet and leave the
       // task that covers `now` running. (Inside a break nothing is running.)
+      // Past the planned end the demo would look finished, so the last task keeps
+      // running — the day stays in progress whenever it's shown.
+      const plannedEnd = plannedTasks[plannedTasks.length - 1].endTime
       const builtTasks: Array<Omit<BuiltTask, 'endTime'> & { endTime: Date | null }> = isToday
         ? plannedTasks
             .filter((t) => t.startTime < now)
-            .map((t) => (t.endTime > now ? { ...t, endTime: null } : t))
+            .map((t) => (t.endTime > now || (now >= plannedEnd && t.endTime === plannedEnd) ? { ...t, endTime: null } : t))
         : plannedTasks
-      const entryEnd = isToday ? null : plannedTasks[plannedTasks.length - 1].endTime
+      const entryEnd = isToday ? null : plannedEnd
 
       db.insert(entries).values({
         id: entryId,

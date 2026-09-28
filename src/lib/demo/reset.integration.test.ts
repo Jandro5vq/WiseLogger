@@ -65,6 +65,17 @@ describe('resetDemoData', () => {
     expect(todayTasks.every((t) => t.endTime !== null)).toBe(true)
   })
 
+  it('keeps today open with the last task still running after hours (Mon 19:50Z)', () => {
+    const { now, today, todayTasks } = seed('2026-09-28T19:50:00.000Z')
+    expect(today!.endTime).toBeNull()
+
+    const running = todayTasks.filter((t) => t.endTime === null)
+    expect(running).toHaveLength(1)
+    const last = todayTasks[todayTasks.length - 1]
+    expect(running[0].id).toBe(last.id)
+    expect(new Date(last.startTime).getTime()).toBeLessThan(now.getTime())
+  })
+
   it('creates an open, empty today before the workday starts (07:00Z)', () => {
     const { today, todayTasks } = seed('2026-09-23T07:00:00.000Z')
     expect(today!.endTime).toBeNull()
