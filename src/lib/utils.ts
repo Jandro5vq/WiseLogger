@@ -53,3 +53,22 @@ export function isoToLocalInput(iso: string): string {
   const pad = (n: number) => n.toString().padStart(2, '0')
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`
 }
+
+export type Period = 'week' | 'month' | 'year'
+
+/** Local-date bounds for a stats period: last 7 days, month-to-date, year-to-date. */
+export function periodBounds(period: Period): { from: string; to: string } {
+  const today = new Date()
+  const to = localDateString(today)
+  if (period === 'week') {
+    const from = new Date(today)
+    from.setDate(today.getDate() - 6)
+    return { from: localDateString(from), to }
+  }
+  if (period === 'month') {
+    const from = new Date(today.getFullYear(), today.getMonth(), 1)
+    return { from: localDateString(from), to }
+  }
+  const from = new Date(today.getFullYear(), 0, 1)
+  return { from: localDateString(from), to }
+}
