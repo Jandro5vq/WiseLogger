@@ -1,7 +1,7 @@
 'use client'
 
 import { useRouter } from 'next/navigation'
-import { useEffect, useState, useTransition } from 'react'
+import { useEffect, useRef, useState, useTransition } from 'react'
 import { TimeInput } from '@/components/ui/time-input'
 import { PenSquare, Cancel, Plus } from 'pixelarticons/react'
 import { useToast } from '@/components/ui/toast'
@@ -13,6 +13,8 @@ interface EntryBreak {
   label: string | null
   fromRuleId: string | null
 }
+
+const QUICK_DURATIONS = [15, 30, 60]
 
 /** Extract local HH:MM from a UTC ISO string or return the raw HH:MM for legacy breaks */
 function toLocalHHMM(breakStart: string): string {
@@ -34,89 +36,114 @@ function nowHHMM(): string {
   return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`
 }
 
+/**
+ * Add/edit form for one break. With `initial` it PATCHes that break, otherwise it
+ * POSTs a new one to the entry. Server errors are shown inline and keep the form open.
+ */
 function BreakForm({
   initial,
+  entryId,
   entryDate,
   onSave,
   onCancel,
 }: {
   initial?: EntryBreak
+  entryId: string
   entryDate: string
   onSave: (b: EntryBreak, deletedDescriptions: string[]) => void
   onCancel: () => void
 }) {
-  const [breakStart, setBreakStart] = useState(() => initial ? toLocalHHMM(initial.breakStart) : '')
+  const [breakStart, setBreakStart] = useState(() => initial ? toLocalHHMM(initial.breakStart) : nowHHMM())
   const [duration, setDuration] = useState(String(initial?.durationMinutes ?? 30))
   const [label, setLabel] = useState(initial?.label ?? '')
   const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
 
   async function save(e: React.FormEvent) {
     e.preventDefault()
     setSaving(true)
-    const body = {
-      breakStart: localTimeToISO(entryDate, breakStart),
-      durationMinutes: parseInt(duration),
-      label: label || null,
+    setError('')
+    const res = await fetch(initial ? `/api/breaks/${initial.id}` : `/api/entries/${entryId}/breaks`, {
+      method: initial ? 'PATCH' : 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        breakStart: localTimeToISO(entryDate, breakStart),
+        durationMinutes: parseInt(duration),
+        label: label || null,
+      }),
+    })
+    const data = await res.json().catch(() => ({}))
+    setSaving(false)
+    if (!res.ok) {
+      setError(data.error ?? (initial ? 'No se pudo guardar la pausa' : 'No se pudo añadir la pausa'))
+      return
     }
-    const url = initial ? `/api/breaks/${initial.id}` : undefined
-    // url is set by parent for POST (entryId required)
-    if (initial) {
-      const res = await fetch(url!, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      })
-      const data = await res.json()
-      setSaving(false)
-      if (res.ok) onSave(data.break, data.deletedDescriptions ?? [])
-    }
+    onSave(data.break, data.deletedDescriptions ?? [])
   }
 
+  const inputClass = 'rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring'
+
   return (
-    <form onSubmit={save} className="flex items-end gap-2 flex-wrap">
-      <div>
-        <label className="text-xs text-muted-foreground block mb-1">Hora</label>
-        <TimeInput
-          value={breakStart}
-          onChange={setBreakStart}
-          required
-          className="rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        />
+    <form onSubmit={save} className="space-y-1.5 pt-1">
+      <div className="flex items-end gap-2 flex-wrap">
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Hora</label>
+          <TimeInput value={breakStart} onChange={setBreakStart} required showNow={!initial} className={inputClass} />
+        </div>
+        <div>
+          <label className="text-xs text-muted-foreground block mb-1">Duración (min)</label>
+          <div className="flex items-center gap-1">
+            <input
+              type="number"
+              min={1}
+              max={480}
+              value={duration}
+              onChange={(e) => setDuration(e.target.value)}
+              required
+              aria-label="Duración en minutos"
+              className={`w-16 ${inputClass}`}
+            />
+            {QUICK_DURATIONS.map((m) => (
+              <button
+                key={m}
+                type="button"
+                onClick={() => setDuration(String(m))}
+                aria-pressed={duration === String(m)}
+                className={`rounded border px-1.5 py-1 text-xs tabular-nums transition-colors ${
+                  duration === String(m)
+                    ? 'border-primary bg-primary/10 text-foreground'
+                    : 'border-border text-muted-foreground hover:bg-accent hover:text-foreground'
+                }`}
+              >
+                {m}
+              </button>
+            ))}
+          </div>
+        </div>
+        <div className="flex-1 min-w-[8rem]">
+          <label className="text-xs text-muted-foreground block mb-1">Etiqueta</label>
+          <input
+            type="text"
+            value={label}
+            onChange={(e) => setLabel(e.target.value)}
+            placeholder="p. ej. Comida"
+            className={`w-full ${inputClass}`}
+          />
+        </div>
+        <div className="flex gap-1.5 pb-0.5">
+          <button
+            type="submit"
+            disabled={saving}
+            className="rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+          >
+            {saving ? 'Guardando…' : initial ? 'Guardar' : 'Añadir'}
+          </button>
+          <button type="button" onClick={onCancel} className="rounded border border-border px-3 py-1 text-xs hover:bg-accent">
+            Cancelar
+          </button>
+        </div>
       </div>
-      <div>
-        <label className="text-xs text-muted-foreground block mb-1">Duración (min)</label>
-        <input
-          type="number"
-          min={1}
-          max={480}
-          value={duration}
-          onChange={(e) => setDuration(e.target.value)}
-          required
-          className="w-20 rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        />
-      </div>
-      <div className="flex-1 min-w-[8rem]">
-        <label className="text-xs text-muted-foreground block mb-1">Etiqueta</label>
-        <input
-          type="text"
-          value={label}
-          onChange={(e) => setLabel(e.target.value)}
-          placeholder="p. ej. Comida"
-          className="w-full rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-        />
-      </div>
-      <div className="flex gap-1.5 pb-0.5">
-        <button
-          type="submit"
-          disabled={saving}
-          className="rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-        >
-          {saving ? 'Guardando…' : 'Guardar'}
-        </button>
-        <button type="button" onClick={onCancel} className="rounded border border-border px-3 py-1 text-xs hover:bg-accent">
-          Cancelar
-        </button>
-      </div>
+      {error && <p className="text-xs text-destructive">{error}</p>}
     </form>
   )
 }
@@ -136,16 +163,23 @@ export function BreaksPanel({
   const [breaks, setBreaks] = useState<EntryBreak[]>(initialBreaks)
   const [showAdd, setShowAdd] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
+  const panelRef = useRef<HTMLDivElement>(null)
 
   // Server refreshes (router.refresh / LiveRefresh) deliver fresh breaks via props;
   // resync so the panel never shows stale rows after an external change.
   useEffect(() => { setBreaks(initialBreaks) }, [initialBreaks])
 
-  // add form local state
-  const [addStart, setAddStart] = useState(nowHHMM)
-  const [addDuration, setAddDuration] = useState('30')
-  const [addLabel, setAddLabel] = useState('')
-  const [adding, setAdding] = useState(false)
+  // Clicking a break on the timeline opens it here for editing.
+  useEffect(() => {
+    function handleEdit(e: Event) {
+      const id = (e as CustomEvent<string>).detail
+      if (!initialBreaks.some((b) => b.id === id)) return
+      setEditingId(id)
+      panelRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+    window.addEventListener('wl:edit-break', handleEdit)
+    return () => window.removeEventListener('wl:edit-break', handleEdit)
+  }, [initialBreaks])
 
   const total = breaks.reduce((s, b) => s + b.durationMinutes, 0)
 
@@ -156,29 +190,18 @@ export function BreaksPanel({
     }
   }
 
-  async function addBreak(e: React.FormEvent) {
-    e.preventDefault()
-    setAdding(true)
-    const res = await fetch(`/api/entries/${entryId}/breaks`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        breakStart: localTimeToISO(entryDate, addStart),
-        durationMinutes: parseInt(addDuration),
-        label: addLabel || null,
-      }),
-    })
-    const data = await res.json()
-    setAdding(false)
-    if (res.ok) {
-      setBreaks((prev) => [...prev, data.break])
-      notifyPisadas(data.deletedDescriptions ?? [])
-      setAddStart(nowHHMM())
-      setAddDuration('30')
-      setAddLabel('')
-      setShowAdd(false)
-      startTransition(() => router.refresh())
-    }
+  function handleAdded(created: EntryBreak, deletedDescriptions: string[]) {
+    setBreaks((prev) => [...prev, created])
+    notifyPisadas(deletedDescriptions)
+    setShowAdd(false)
+    startTransition(() => router.refresh())
+  }
+
+  function handleEdited(updated: EntryBreak, deletedDescriptions: string[]) {
+    notifyPisadas(deletedDescriptions)
+    setBreaks((prev) => prev.map((b) => (b.id === updated.id ? updated : b)))
+    setEditingId(null)
+    startTransition(() => router.refresh())
   }
 
   async function deleteBreak(id: string) {
@@ -203,22 +226,18 @@ export function BreaksPanel({
             }),
           })
           const data = await r.json().catch(() => ({}))
-          if (r.ok && data.break) setBreaks((prev) => [...prev, data.break])
+          if (!r.ok) { toast.error(data.error ?? 'No se pudo restaurar la pausa'); return }
+          if (data.break) setBreaks((prev) => [...prev, data.break])
           startTransition(() => router.refresh())
         },
       },
     })
   }
 
-  function handleEdited(updated: EntryBreak, deletedDescriptions: string[]) {
-    notifyPisadas(deletedDescriptions)
-    setBreaks((prev) => prev.map((b) => (b.id === updated.id ? updated : b)))
-    setEditingId(null)
-    startTransition(() => router.refresh())
-  }
+  const sorted = [...breaks].sort((a, b) => toLocalHHMM(a.breakStart).localeCompare(toLocalHHMM(b.breakStart)))
 
   return (
-    <div data-tour="breaks" className="rounded-lg border border-border bg-card">
+    <div ref={panelRef} data-tour="breaks" className="rounded-lg border border-border bg-card">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
         <div className="flex items-center gap-2">
           <h2 className="text-sm font-medium">Pausas</h2>
@@ -230,7 +249,7 @@ export function BreaksPanel({
         </div>
         {!showAdd && (
           <button
-            onClick={() => { setAddStart(nowHHMM()); setShowAdd(true) }}
+            onClick={() => { setEditingId(null); setShowAdd(true) }}
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
           >
             <Plus width={14} height={14} />
@@ -244,35 +263,38 @@ export function BreaksPanel({
           <p className="text-xs text-muted-foreground text-center py-2">Sin pausas este día.</p>
         )}
 
-        {breaks.map((b) => (
+        {sorted.map((b) => (
           <div key={b.id}>
             {editingId === b.id ? (
               <BreakForm
                 initial={b}
+                entryId={entryId}
                 entryDate={entryDate}
                 onSave={handleEdited}
                 onCancel={() => setEditingId(null)}
               />
             ) : (
               <div className="flex items-center justify-between text-sm">
-                <div className="flex items-center gap-3">
-                  <span className="font-mono text-xs text-muted-foreground w-10">{toLocalHHMM(b.breakStart)}</span>
-                  <span className="font-medium tabular-nums">{b.durationMinutes}m</span>
-                  {b.label && <span className="text-muted-foreground">{b.label}</span>}
+                <div className="flex items-center gap-3 min-w-0">
+                  <span className="font-mono text-xs text-muted-foreground w-10 shrink-0">{toLocalHHMM(b.breakStart)}</span>
+                  <span className="font-medium tabular-nums shrink-0">{b.durationMinutes}m</span>
+                  {b.label && <span className="text-muted-foreground truncate">{b.label}</span>}
                   {b.fromRuleId && (
-                    <span className="text-[10px] text-muted-foreground/60 border border-border rounded px-1">auto</span>
+                    <span className="text-[10px] text-muted-foreground/60 border border-border rounded px-1 shrink-0">auto</span>
                   )}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 shrink-0">
                   <button
                     onClick={() => setEditingId(b.id)}
                     className="text-muted-foreground hover:text-foreground p-0.5"
+                    aria-label="Editar pausa" title="Editar pausa"
                   >
                     <PenSquare width={16} height={16} />
                   </button>
                   <button
                     onClick={() => deleteBreak(b.id)}
                     className="text-muted-foreground hover:text-destructive p-0.5"
+                    aria-label="Eliminar pausa" title="Eliminar pausa"
                   >
                     <Cancel width={16} height={16} />
                   </button>
@@ -283,52 +305,12 @@ export function BreaksPanel({
         ))}
 
         {showAdd && (
-          <form onSubmit={addBreak} className="flex items-end gap-2 flex-wrap pt-1">
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">Hora</label>
-              <TimeInput
-                value={addStart}
-                onChange={setAddStart}
-                required
-                showNow
-                className="rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">Duración (min)</label>
-              <input
-                type="number"
-                min={1}
-                max={480}
-                value={addDuration}
-                onChange={(e) => setAddDuration(e.target.value)}
-                required
-                className="w-20 rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-            <div className="flex-1 min-w-[8rem]">
-              <label className="text-xs text-muted-foreground block mb-1">Etiqueta</label>
-              <input
-                type="text"
-                value={addLabel}
-                onChange={(e) => setAddLabel(e.target.value)}
-                placeholder="p. ej. Comida"
-                className="w-full rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
-              />
-            </div>
-            <div className="flex gap-1.5 pb-0.5">
-              <button
-                type="submit"
-                disabled={adding}
-                className="rounded bg-primary px-3 py-1 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
-              >
-                {adding ? 'Añadiendo…' : 'Añadir'}
-              </button>
-              <button type="button" onClick={() => setShowAdd(false)} className="rounded border border-border px-3 py-1 text-xs hover:bg-accent">
-                Cancelar
-              </button>
-            </div>
-          </form>
+          <BreakForm
+            entryId={entryId}
+            entryDate={entryDate}
+            onSave={handleAdded}
+            onCancel={() => setShowAdd(false)}
+          />
         )}
       </div>
     </div>

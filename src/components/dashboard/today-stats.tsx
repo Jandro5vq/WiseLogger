@@ -12,6 +12,8 @@ interface TodayStatsProps {
   totalBreakMinutes: number        // sum of today's breaks (shifts expectedEnd)
   activeTaskStartTime?: string     // ISO — for live "worked" ticking
   breaks?: BreakInterval[]         // today's breaks, to keep live time net
+  entryEndTime?: string            // set once the day is closed — shown instead of the forecast
+  stacked?: boolean                // one column on wide screens (when sharing a row)
 }
 
 function fmtHHMM(ms: number): string {
@@ -27,6 +29,8 @@ export function TodayStats({
   totalBreakMinutes,
   activeTaskStartTime,
   breaks = [],
+  entryEndTime,
+  stacked = false,
 }: TodayStatsProps) {
   const [now, setNow] = useState(() => Date.now())
 
@@ -64,8 +68,12 @@ export function TodayStats({
     ? (now - expectedEndMs) / 60_000
     : dayBalance
 
+  const isClosed = !!entryEndTime
+  const remainingTaskMinutes = Math.max(0, -dayBalance)
+  const remainingClockMinutes = Math.max(0, (expectedEndMs - now) / 60_000)
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
+    <div className={`grid grid-cols-1 sm:grid-cols-2 gap-4 ${stacked ? 'lg:grid-cols-1' : ''}`}>
       {/* task time */}
       <div className="rounded-lg border border-border bg-card p-4">
         <p className="text-xs text-muted-foreground uppercase tracking-wide">Tiempo en tareas</p>
@@ -76,18 +84,34 @@ export function TodayStats({
             style={{ width: `${progress}%` }}
           />
         </div>
-        <p className="text-xs text-muted-foreground mt-1">de {formatMinutes(expectedMinutes)}</p>
+        <p className="text-xs text-muted-foreground mt-1 tabular-nums">
+          de {formatMinutes(expectedMinutes)}
+          {remainingTaskMinutes > 0 && <> · faltan <span className="font-medium text-foreground">{formatMinutes(remainingTaskMinutes)}</span></>}
+        </p>
       </div>
 
       {/* expected end — fixed clock, remaining countdown */}
       <div className={`rounded-lg border bg-card p-4 ${isOvertime ? 'border-green-500/50' : 'border-border'}`}>
-        <p className="text-xs text-muted-foreground uppercase tracking-wide">Fin de jornada</p>
-        <p className="text-2xl font-bold mt-1 tabular-nums">{fmtHHMM(expectedEndMs)}</p>
-        {isOvertime && (
+        <p className="text-xs text-muted-foreground uppercase tracking-wide">
+          Fin de jornada {!isClosed && <span className="normal-case tracking-normal opacity-70">(previsto)</span>}
+        </p>
+        <p className="text-2xl font-bold mt-1 tabular-nums">
+          {fmtHHMM(entryEndTime ? new Date(entryEndTime).getTime() : expectedEndMs)}
+        </p>
+        {isClosed ? (
+          <p className="text-xs text-muted-foreground mt-1 tabular-nums">
+            Previsto a las {fmtHHMM(expectedEndMs)}
+            {isOvertime && <span className="text-green-600 dark:text-green-400 font-medium"> · +{formatMinutes(overtimeMinutes)} extra</span>}
+          </p>
+        ) : isOvertime ? (
           <p className="text-xs text-green-600 dark:text-green-400 mt-1 font-medium tabular-nums">
             +{formatMinutes(overtimeMinutes)} extra
           </p>
-        )}
+        ) : activeTaskStartTime ? (
+          <p className="text-xs text-muted-foreground mt-1 tabular-nums">
+            en {formatMinutes(remainingClockMinutes)}
+          </p>
+        ) : null}
       </div>
     </div>
   )

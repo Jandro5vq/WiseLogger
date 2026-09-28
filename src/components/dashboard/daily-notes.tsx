@@ -47,28 +47,70 @@ function NotesViewer({ html }: { html: string }) {
   )
 }
 
-export function DailyNotes({ entryId, initialNotes, recentEntries }: DailyNotesProps) {
-  const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
-  const savedTimerRef = useRef<ReturnType<typeof setTimeout>>()
+/** Idle time after the last keystroke before the notes are saved. */
+const AUTOSAVE_MS = 1500
 
-  useEffect(() => () => { clearTimeout(savedTimerRef.current) }, [])
+export function DailyNotes({ entryId, initialNotes, recentEntries }: DailyNotesProps) {
+  const [status, setStatus] = useState<'idle' | 'dirty' | 'saving' | 'saved' | 'error'>('idle')
+  const savedTimerRef = useRef<ReturnType<typeof setTimeout>>()
+  const debounceRef = useRef<ReturnType<typeof setTimeout>>()
+  // Last HTML the server has; lets us skip no-op saves and know what's still pending.
+  const lastSavedRef = useRef(initialNotes || '')
+  const pendingRef = useRef<string | null>(null)
 
   const save = useCallback(
     async (html: string) => {
-      setSaving(true)
-      await fetch(`/api/entries/${entryId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ notes: html }),
-      })
-      setSaving(false)
-      setSaved(true)
+      clearTimeout(debounceRef.current)
+      if (html === lastSavedRef.current) { pendingRef.current = null; return }
+      setStatus('saving')
+      try {
+        const res = await fetch(`/api/entries/${entryId}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ notes: html }),
+        })
+        if (!res.ok) throw new Error()
+      } catch {
+        setStatus('error')
+        return
+      }
+      lastSavedRef.current = html
+      // Newer keystrokes may have arrived while this request was in flight.
+      if (pendingRef.current === html) pendingRef.current = null
+      setStatus(pendingRef.current === null ? 'saved' : 'dirty')
       clearTimeout(savedTimerRef.current)
-      savedTimerRef.current = setTimeout(() => setSaved(false), 2000)
+      savedTimerRef.current = setTimeout(() => setStatus((s) => (s === 'saved' ? 'idle' : s)), 2000)
     },
     [entryId]
   )
+
+  // Leaving the page (tab close, navigation, backgrounding) flushes pending notes with a
+  // keepalive request, which the browser completes even after the page is gone.
+  useEffect(() => {
+    function flush() {
+      const html = pendingRef.current
+      if (html === null || html === lastSavedRef.current) return
+      clearTimeout(debounceRef.current)
+      fetch(`/api/entries/${entryId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ notes: html }),
+        keepalive: true,
+      }).catch(() => {})
+      lastSavedRef.current = html
+      pendingRef.current = null
+    }
+    function onVisibility() { if (document.visibilityState === 'hidden') flush() }
+    window.addEventListener('pagehide', flush)
+    document.addEventListener('visibilitychange', onVisibility)
+    return () => {
+      flush()
+      window.removeEventListener('pagehide', flush)
+      document.removeEventListener('visibilitychange', onVisibility)
+      clearTimeout(savedTimerRef.current)
+      clearTimeout(debounceRef.current)
+    }
+  }, [entryId])
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -77,6 +119,13 @@ export function DailyNotes({ entryId, initialNotes, recentEntries }: DailyNotesP
       Placeholder.configure({ placeholder: 'Notas del día…' }),
     ],
     content: initialNotes || '',
+    onUpdate({ editor }) {
+      const html = editor.getHTML()
+      pendingRef.current = html
+      setStatus('dirty')
+      clearTimeout(debounceRef.current)
+      debounceRef.current = setTimeout(() => save(html), AUTOSAVE_MS)
+    },
     onBlur({ editor }) {
       save(editor.getHTML())
     },
@@ -92,8 +141,19 @@ export function DailyNotes({ entryId, initialNotes, recentEntries }: DailyNotesP
     <div data-tour="daily-notes" className="rounded-lg border border-border bg-card overflow-hidden">
       <div className="flex items-center justify-between px-4 py-3 border-b border-border/60">
         <h2 className="text-sm font-medium flex items-center gap-1.5"><Note width={16} height={16} />Notas</h2>
-        {saving && <span className="text-xs text-muted-foreground">Guardando…</span>}
-        {!saving && saved && <span className="text-xs text-green-600 dark:text-green-400">Guardado</span>}
+        <span aria-live="polite" className="text-xs">
+          {status === 'dirty' && <span className="text-muted-foreground">Sin guardar…</span>}
+          {status === 'saving' && <span className="text-muted-foreground">Guardando…</span>}
+          {status === 'saved' && <span className="text-green-600 dark:text-green-400">Guardado</span>}
+          {status === 'error' && (
+            <button
+              onClick={() => editor && save(editor.getHTML())}
+              className="text-destructive underline-offset-2 hover:underline"
+            >
+              Error al guardar · Reintentar
+            </button>
+          )}
+        </span>
       </div>
 
       {/* editor */}

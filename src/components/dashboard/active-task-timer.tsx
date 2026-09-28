@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from 'react'
 import { useRouter } from 'next/navigation'
-import { formatElapsed, isoToLocalInput } from '@/lib/utils'
+import { formatElapsed, formatMinutes, isoToLocalInput } from '@/lib/utils'
 import { dateStringInTz } from '@/lib/tz'
 import { DateTimeInput } from '@/components/ui/date-time-input'
 import { useToast } from '@/components/ui/toast'
@@ -17,9 +17,25 @@ interface ActiveTaskTimerProps {
   breaks: BreakInterval[]
   /** User's IANA timezone — drives the day-rollover refresh check. */
   timezone: string
+  /** Net minutes already logged today on earlier sessions of this same task. */
+  priorMinutes?: number
+  /** Workday clock shown under the task timer (clock-in minus breaks). */
+  workdayClock?: React.ReactNode
 }
 
-export function ActiveTaskTimer({ task, loadedDate, entryId, breaks, timezone }: ActiveTaskTimerProps) {
+/** Mirrors the timer in the tab title so it's visible from other tabs. */
+function useDocumentTitle(title: string | null) {
+  const baseRef = useRef<string | null>(null)
+  useEffect(() => {
+    if (baseRef.current === null) baseRef.current = document.title
+    if (title) document.title = title
+  }, [title])
+  useEffect(() => () => {
+    if (baseRef.current !== null) document.title = baseRef.current
+  }, [])
+}
+
+export function ActiveTaskTimer({ task, loadedDate, entryId, breaks, timezone, priorMinutes = 0, workdayClock }: ActiveTaskTimerProps) {
   const router = useRouter()
   const toast = useToast()
   const [, startTransition] = useTransition()
@@ -85,6 +101,19 @@ export function ActiveTaskTimer({ task, loadedDate, entryId, breaks, timezone }:
     return () => window.removeEventListener('wl:stop-task', handleStop)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  // Clicking the running bar on the timeline opens the edit form here.
+  const rootRef = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    function handleEdit(e: Event) {
+      if ((e as CustomEvent<string>).detail !== task.id) return
+      setEditing(true)
+      setError('')
+      rootRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    }
+    window.addEventListener('wl:edit-task', handleEdit)
+    return () => window.removeEventListener('wl:edit-task', handleEdit)
+  }, [task.id])
 
   async function splitAtBreak(b: { startIso: string; endIso: string }) {
     const res = await fetch(`/api/tasks/${task.id}/stop`, {
@@ -152,12 +181,18 @@ export function ActiveTaskTimer({ task, loadedDate, entryId, breaks, timezone }:
     startTransition(() => router.refresh())
   }
 
+  useDocumentTitle(
+    stopped ? null
+      : breakDisplay ? `⏸ ${formatElapsed(elapsedMs)} · ${task.description}`
+      : `▶ ${formatElapsed(elapsedMs)} · ${task.description}`
+  )
+
   if (stopped) return null
 
   // ── In-break UI ─────────────────────────────────────────────────────────────
   if (breakDisplay) {
     return (
-      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4 mb-4">
+      <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
         <div className="flex items-center justify-between">
           <div className="min-w-0 flex-1">
             <div className="flex items-center gap-2">
@@ -178,6 +213,7 @@ export function ActiveTaskTimer({ task, loadedDate, entryId, breaks, timezone }:
           <div className="text-right shrink-0 ml-4">
             <p className="text-xs text-muted-foreground">Reanuda en</p>
             <p className="text-2xl font-mono font-bold tabular-nums">{formatElapsed(elapsedMs)}</p>
+            {workdayClock && <div className="mt-1">{workdayClock}</div>}
           </div>
         </div>
       </div>
@@ -186,7 +222,7 @@ export function ActiveTaskTimer({ task, loadedDate, entryId, breaks, timezone }:
 
   // ── Normal running UI ────────────────────────────────────────────────────────
   return (
-    <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 mb-4">
+    <div ref={rootRef} className="rounded-lg border border-primary/30 bg-primary/5 p-4">
       <div className="flex items-center justify-between">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -208,16 +244,31 @@ export function ActiveTaskTimer({ task, loadedDate, entryId, breaks, timezone }:
               ))}
             </div>
           )}
+          {priorMinutes > 0 && (
+            <p className="text-xs text-muted-foreground mt-1 tabular-nums">
+              Hoy en esta tarea: <span className="font-medium text-foreground">{formatMinutes(priorMinutes + elapsedMs / 60_000)}</span>
+            </p>
+          )}
         </div>
         <div className="text-right shrink-0 ml-4">
           <p className="text-2xl font-mono font-bold tabular-nums">{formatElapsed(elapsedMs)}</p>
-          <button
-            onClick={stopTask}
-            disabled={stopping}
-            className="mt-2 rounded bg-destructive px-3 py-1 text-xs font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
-          >
-            {stopping ? 'Deteniendo…' : 'Detener (S)'}
-          </button>
+          {workdayClock && <div className="mt-0.5">{workdayClock}</div>}
+          <div className="mt-2 flex justify-end gap-1.5">
+            <button
+              onClick={() => window.dispatchEvent(new CustomEvent('wl:new-task'))}
+              className="rounded border border-border px-3 py-1 text-xs hover:bg-accent transition-colors"
+              title="Empezar otra tarea (la actual se detiene)"
+            >
+              Cambiar a… <span className="opacity-60">(N)</span>
+            </button>
+            <button
+              onClick={stopTask}
+              disabled={stopping}
+              className="rounded border border-border bg-card px-3 py-1 text-xs font-medium hover:bg-accent disabled:opacity-50"
+            >
+              {stopping ? 'Deteniendo…' : 'Detener (S)'}
+            </button>
+          </div>
         </div>
       </div>
 
