@@ -94,7 +94,7 @@ function RegisterForm() {
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
-            <p id="password-hint" className="mt-1 text-xs text-muted-foreground">Mínimo 8 caracteres.</p>
+            <p id="password-hint" className="mt-1 text-xs text-muted-foreground">Mínimo 8 caracteres, con mayúscula, minúscula y número.</p>
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}
