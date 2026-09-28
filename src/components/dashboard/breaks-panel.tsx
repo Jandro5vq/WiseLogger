@@ -290,6 +290,7 @@ export function BreaksPanel({
                 value={addStart}
                 onChange={setAddStart}
                 required
+                showNow
                 className="rounded border border-input bg-background px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
               />
             </div>
