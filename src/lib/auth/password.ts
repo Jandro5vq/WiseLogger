@@ -16,6 +16,8 @@ export async function verifyPassword(plain: string, hash: string): Promise<boole
 
 /** Returns an error message if password is too weak, or null if OK. */
 export function validatePassword(password: string): string | null {
+  if (password !== password.trim()) return 'La contraseña no puede empezar ni terminar con espacios'
+  if (Buffer.byteLength(password, 'utf8') > 72) return 'La contraseña es demasiado larga (máximo 72 caracteres)'
   if (password.length < 8) return 'La contraseña debe tener al menos 8 caracteres'
   if (!/[a-z]/.test(password)) return 'La contraseña debe incluir al menos una letra minúscula'
   if (!/[A-Z]/.test(password)) return 'La contraseña debe incluir al menos una letra mayúscula'

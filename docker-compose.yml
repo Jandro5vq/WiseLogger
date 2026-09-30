@@ -22,6 +22,9 @@ services:
       - BACKUP_CRON=${BACKUP_CRON:-0 2 * * *}
       - BACKUP_PATH=/data/backups
       - AUTO_CLOSE_CRON=${AUTO_CLOSE_CRON:-55 23 * * *}
+      - PASSWORD_RESET_EXPIRY_HOURS=${PASSWORD_RESET_EXPIRY_HOURS:-24}
+      - USER_DELETE_RETENTION_DAYS=${USER_DELETE_RETENTION_DAYS:-30}
+      - USER_PURGE_CRON=${USER_PURGE_CRON:-30 3 * * *}
     restart: unless-stopped
     deploy:
       resources:

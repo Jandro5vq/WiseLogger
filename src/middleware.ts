@@ -8,7 +8,13 @@ import { COOKIE_NAME } from '@/lib/auth/cookies'
 interface RateBucket { count: number; resetAt: number }
 const rateBuckets = new Map<string, RateBucket>()
 
-const AUTH_PATHS = new Set(['/api/auth/login', '/api/register', '/api/setup'])
+const AUTH_PATHS = new Set([
+  '/api/auth/login',
+  '/api/auth/forgot-password',
+  '/api/auth/reset-password',
+  '/api/register',
+  '/api/setup',
+])
 const AUTH_LIMIT = 10   // per minute
 const API_LIMIT = 100   // per minute
 

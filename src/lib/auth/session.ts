@@ -44,19 +44,23 @@ export async function getSession(req?: NextRequest): Promise<Session | null> {
       timezone: users.timezone,
       validSince: users.validSince,
       onboardingResetAt: users.onboardingResetAt,
+      deletedAt: users.deletedAt,
     })
     .from(users)
     .where(eq(users.id, payload.sub))
     .get()
 
   if (!user || !user.isActive) return null
+  // Soft-deleted users (in the trash) behave as if they did not exist
+  const { deletedAt, ...sessionUser } = user
+  if (deletedAt) return null
 
   // Revocation check: reject tokens issued before validSince
-  if (payload.iat != null && new Date(payload.iat * 1000) < new Date(user.validSince)) {
+  if (payload.iat != null && new Date(payload.iat * 1000) < new Date(sessionUser.validSince)) {
     return null
   }
 
-  return { user, payload }
+  return { user: sessionUser, payload }
 }
 
 export async function requireSession(req?: NextRequest): Promise<Session> {

@@ -1,6 +1,6 @@
 import { listUnclosedEntriesBefore, updateEntry } from '@/lib/db/queries/entries'
 import { listTasksForEntry, updateTask } from '@/lib/db/queries/tasks'
-import { listUsers } from '@/lib/db/queries/users'
+import { listLiveUsers } from '@/lib/db/queries/users'
 import { getEntryBreaks } from '@/lib/db/queries/entry-breaks'
 import { breakToInterval } from '@/lib/business/breaks'
 import { splitTasksAroundBreak, mergeContiguousSpans } from '@/lib/business/spans'
@@ -82,7 +82,7 @@ export function autoCloseEntry(entry: Entry): void {
 function closeStaleEntriesForAllUsers(): number {
   let processed = 0
   const now = new Date()
-  for (const user of listUsers()) {
+  for (const user of listLiveUsers()) {
     const userToday = dateStringInTz(now, user.timezone)
     const unclosed = listUnclosedEntriesBefore(user.id, userToday)
     for (const entry of unclosed) {

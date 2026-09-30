@@ -19,8 +19,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Username and password are required' }, { status: 400 })
   }
 
-  const user = getUserByUsername(username)
-  if (!user) {
+  // Trim: a stray space when typing the username must not fail the login.
+  // Lookup is case-insensitive ('juan' finds 'Juan').
+  const user = getUserByUsername(String(username).trim())
+  if (!user || user.deletedAt) {
     // Timing-safe: always run bcrypt to prevent username enumeration
     await verifyPassword(password, DUMMY_HASH)
     return NextResponse.json({ error: 'Invalid credentials' }, { status: 401 })

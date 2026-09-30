@@ -1,27 +1,39 @@
 import { db } from '@/lib/db'
 import { users } from '@db/schema'
-import { eq, sql } from 'drizzle-orm'
+import { eq, isNull, sql } from 'drizzle-orm'
+import { normalizeEmail, usernameKey } from '@/lib/auth/username'
+
+// Lookups below also return soft-deleted users (deletedAt set): their username and
+// email stay reserved while they are in the trash. Callers that authenticate must
+// reject them explicitly.
 
 export function getUserById(id: string) {
   return db.select().from(users).where(eq(users.id, id)).get()
 }
 
 export function getUserByEmail(email: string) {
-  return db.select().from(users).where(eq(users.email, email)).get()
+  return db.select().from(users).where(eq(users.email, normalizeEmail(email))).get()
 }
 
 export function getUserByUsername(username: string) {
-  return db.select().from(users)
-    .where(eq(sql`LOWER(${users.username})`, username.toLowerCase()))
-    .get()
+  // Compared in JS: SQLite's LOWER() only folds ASCII, so 'Íñigo' ≠ 'íñigo' there.
+  const key = usernameKey(username)
+  if (!key) return undefined
+  return db.select().from(users).all().find((u) => usernameKey(u.username) === key)
 }
 
 export function getUserByMcpKeyHash(hash: string) {
   return db.select().from(users).where(eq(users.mcpApiKeyHash, hash)).get()
 }
 
+/** Every user, including soft-deleted ones (admin views). */
 export function listUsers() {
   return db.select().from(users).all()
+}
+
+/** Users that are not in the trash — use this for background jobs and stats. */
+export function listLiveUsers() {
+  return db.select().from(users).where(isNull(users.deletedAt)).all()
 }
 
 export function createUser(data: {

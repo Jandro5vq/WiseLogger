@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
 import { entries, tasks, users } from '@db/schema'
-import { between, count, countDistinct, eq, isNull, max } from 'drizzle-orm'
+import { and, between, count, countDistinct, eq, isNull, max } from 'drizzle-orm'
 import { computeBalance } from '@/lib/business/balance'
 
 /**
@@ -35,7 +35,8 @@ export interface ActivitySummary {
 
 /** An "active day" is an entry in [from, to] with at least one task. */
 export function computeActivitySummary(from: string, to: string): ActivitySummary {
-  const inRange = between(entries.date, from, to)
+  // Soft-deleted users (in the trash) are excluded from every figure
+  const inRange = and(between(entries.date, from, to), isNull(users.deletedAt))
 
   const allUsers = db
     .select({
@@ -46,6 +47,7 @@ export function computeActivitySummary(from: string, to: string): ActivitySummar
       timezone: users.timezone,
     })
     .from(users)
+    .where(isNull(users.deletedAt))
     .orderBy(users.username)
     .all()
 
@@ -54,6 +56,7 @@ export function computeActivitySummary(from: string, to: string): ActivitySummar
       .select({ userId: entries.userId, days: countDistinct(entries.date) })
       .from(entries)
       .innerJoin(tasks, eq(tasks.entryId, entries.id))
+      .innerJoin(users, eq(users.id, entries.userId))
       .where(inRange)
       .groupBy(entries.userId)
       .all()
@@ -64,6 +67,7 @@ export function computeActivitySummary(from: string, to: string): ActivitySummar
     .select({ date: entries.date, activeUsers: countDistinct(entries.userId) })
     .from(entries)
     .innerJoin(tasks, eq(tasks.entryId, entries.id))
+    .innerJoin(users, eq(users.id, entries.userId))
     .where(inRange)
     .groupBy(entries.date)
     .orderBy(entries.date)
@@ -74,11 +78,17 @@ export function computeActivitySummary(from: string, to: string): ActivitySummar
       .select({ n: count() })
       .from(tasks)
       .innerJoin(entries, eq(tasks.entryId, entries.id))
+      .innerJoin(users, eq(users.id, entries.userId))
       .where(inRange)
       .get()?.n ?? 0
 
   const runningTasks =
-    db.select({ n: count() }).from(tasks).where(isNull(tasks.endTime)).get()?.n ?? 0
+    db
+      .select({ n: count() })
+      .from(tasks)
+      .innerJoin(users, eq(users.id, tasks.userId))
+      .where(and(isNull(tasks.endTime), isNull(users.deletedAt)))
+      .get()?.n ?? 0
 
   const lastByUser = new Map(
     db

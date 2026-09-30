@@ -2,14 +2,17 @@
 
 import { Suspense, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { normalizeUsername, validateUsername } from '@/lib/auth/username'
 
 function RegisterForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const token = searchParams.get('token') ?? ''
-  const [form, setForm] = useState({ username: '', email: '', password: '' })
+  const [form, setForm] = useState({ username: '', email: '', password: '', confirm: '' })
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const normalized = normalizeUsername(form.username)
+  const usernamePreview = normalized && normalized !== form.username ? normalized : ''
 
   if (!token) {
     return (
@@ -26,13 +29,22 @@ function RegisterForm() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
+    const usernameError = validateUsername(normalizeUsername(form.username))
+    if (usernameError) {
+      setError(usernameError)
+      return
+    }
+    if (form.password !== form.confirm) {
+      setError('Las contraseñas no coinciden')
+      return
+    }
     setError('')
     setLoading(true)
 
     const res = await fetch('/api/register', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ token, ...form }),
+      body: JSON.stringify({ token, username: form.username, email: form.email, password: form.password }),
     })
 
     const data = await res.json()
@@ -60,12 +72,19 @@ function RegisterForm() {
             <input
               id="username"
               autoComplete="username"
+              aria-describedby="username-hint"
               type="text"
               required
+              minLength={3}
+              maxLength={30}
               value={form.username}
               onChange={(e) => setForm({ ...form, username: e.target.value })}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
+            <p id="username-hint" className="mt-1 text-xs text-muted-foreground">
+              3–30 caracteres, sin espacios: letras, números, punto, guion o guion bajo.
+              {usernamePreview && <> Se guardará como <strong className="text-foreground">{usernamePreview}</strong>.</>}
+            </p>
           </div>
 
           <div>
@@ -90,11 +109,25 @@ function RegisterForm() {
               type="password"
               required
               minLength={8}
+              maxLength={72}
               value={form.password}
               onChange={(e) => setForm({ ...form, password: e.target.value })}
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
             <p id="password-hint" className="mt-1 text-xs text-muted-foreground">Mínimo 8 caracteres, con mayúscula, minúscula y número.</p>
+          </div>
+
+          <div>
+            <label htmlFor="confirm" className="block text-sm font-medium mb-1">Repite la contraseña</label>
+            <input
+              id="confirm"
+              autoComplete="new-password"
+              type="password"
+              required
+              value={form.confirm}
+              onChange={(e) => setForm({ ...form, confirm: e.target.value })}
+              className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
+            />
           </div>
 
           {error && <p className="text-sm text-destructive">{error}</p>}

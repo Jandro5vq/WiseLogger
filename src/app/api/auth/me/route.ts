@@ -3,7 +3,8 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
-import { updateUser, getUserByUsername } from '@/lib/db/queries/users'
+import { updateUser } from '@/lib/db/queries/users'
+import { checkUsername } from '@/lib/business/user-identity'
 
 export async function GET() {
   const session = await getSession()
@@ -19,13 +20,9 @@ export async function PATCH(req: NextRequest) {
   const updates: Record<string, unknown> = {}
 
   if ('username' in body) {
-    const trimmed = (body.username ?? '').trim()
-    if (!trimmed) return NextResponse.json({ error: 'Username is required' }, { status: 400 })
-    const existing = getUserByUsername(trimmed)
-    if (existing && existing.id !== session.user.id) {
-      return NextResponse.json({ error: 'Username already taken' }, { status: 409 })
-    }
-    updates.username = trimmed
+    const username = checkUsername(body.username, session.user.id)
+    if (!username.ok) return NextResponse.json({ error: username.error }, { status: username.status })
+    updates.username = username.value
   }
 
   if ('timezone' in body) {
@@ -41,7 +38,9 @@ export async function PATCH(req: NextRequest) {
   }
 
   const updated = updateUser(session.user.id, updates)
-  return NextResponse.json(updated)
+  if (!updated) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  // Never echo secrets back to the client
+  return NextResponse.json({ ...updated, passwordHash: undefined, mcpApiKeyHash: undefined })
 }
 
 function isValidTimezone(tz: string): boolean {

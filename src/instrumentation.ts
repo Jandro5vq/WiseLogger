@@ -12,5 +12,9 @@ export async function register() {
     const { runStartupAutoClose, scheduleAutoClose } = await import('@/lib/business/auto-close')
     runStartupAutoClose()
     scheduleAutoClose()
+
+    const { runStartupUserPurge, scheduleUserPurge } = await import('@/lib/business/user-lifecycle')
+    runStartupUserPurge()
+    scheduleUserPurge()
   }
 }

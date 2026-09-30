@@ -26,3 +26,12 @@ export const ScheduleRuleCreateSchema = z.object({
   label: z.string().nullable().optional(),
 })
 export const ScheduleRulePatchSchema = ScheduleRuleCreateSchema.partial()
+
+// Admin edit of a user. Username/email are normalized + checked for uniqueness in the route.
+export const AdminUserPatchSchema = z
+  .object({
+    isActive: z.boolean().optional(),
+    username: z.string().optional(),
+    email: z.string().optional(),
+  })
+  .refine((b) => Object.values(b).some((v) => v !== undefined), 'No hay cambios que aplicar')

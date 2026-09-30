@@ -13,6 +13,7 @@ export const users = sqliteTable('users', {
   onboardingResetAt: text('onboarding_reset_at'), // when non-null, clients with an older wl:onboarded timestamp re-run the tour
   createdAt: text('created_at').notNull(),
   lastLoginAt: text('last_login_at'),
+  deletedAt: text('deleted_at'), // soft delete: non-null = in the trash, purged after the retention period
 })
 
 export const entries = sqliteTable(
@@ -120,4 +121,25 @@ export const invitations = sqliteTable('invitations', {
   expiresAt: text('expires_at').notNull(),
   usedAt: text('used_at'),
   usedBy: text('used_by').references(() => users.id),
+})
+
+export const passwordResetRequests = sqliteTable('password_reset_requests', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  requestedAt: text('requested_at').notNull(),
+  resolvedAt: text('resolved_at'), // set when an admin issues a link (or the user resets / is deleted)
+})
+
+export const passwordResetTokens = sqliteTable('password_reset_tokens', {
+  id: text('id').primaryKey(),
+  userId: text('user_id')
+    .notNull()
+    .references(() => users.id, { onDelete: 'cascade' }),
+  tokenHash: text('token_hash').notNull().unique(), // sha256 of the raw token; the raw token is only shown once
+  createdBy: text('created_by'), // admin id (no FK: the admin may be purged later)
+  createdAt: text('created_at').notNull(),
+  expiresAt: text('expires_at').notNull(),
+  usedAt: text('used_at'), // also set when the token is superseded or revoked
 })

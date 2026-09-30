@@ -10,7 +10,11 @@ const sqlite = new Database(dbPath)
 sqlite.pragma('journal_mode = WAL')
 sqlite.pragma('foreign_keys = ON')
 
-const existing = sqlite.prepare('SELECT id FROM users WHERE username = ?').get('demo')
+// Case-insensitive + by email: usernames are stored capitalized ('Demo') and an
+// admin may have renamed it. A strict match here re-inserted it and crashed startup.
+const existing = sqlite
+  .prepare("SELECT id FROM users WHERE lower(username) = 'demo' OR email = 'demo@demo.local'")
+  .get()
 if (existing) {
   console.log('[seed-demo] Demo user already exists, skipping')
   sqlite.close()

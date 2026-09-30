@@ -935,6 +935,8 @@ export default function SettingsPage() {
     })
     const data = await res.json()
     setUsernameMsg(res.ok ? 'Username updated' : (data.error ?? 'Failed'))
+    // Show the name as stored (trimmed, first letter upper-cased)
+    if (res.ok && data.username) setUsername(data.username)
   }
 
   async function changePassword(e: React.FormEvent) {
@@ -1250,6 +1252,9 @@ export default function SettingsPage() {
               value={username}
               onChange={(e) => { setUsername(e.target.value); setUsernameMsg('') }}
               required
+              minLength={3}
+              maxLength={30}
+              aria-describedby="username-hint"
               className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-ring"
             />
           </div>
@@ -1257,6 +1262,9 @@ export default function SettingsPage() {
             Guardar
           </button>
         </form>
+        <p id="username-hint" className="mt-1 text-xs text-muted-foreground">
+          También es tu usuario para iniciar sesión. 3–30 caracteres, sin espacios: letras, números, punto, guion o guion bajo.
+        </p>
         {usernameMsg && (
           <p className={`text-sm mt-2 ${usernameMsg.includes('actualizado') || usernameMsg.includes('updated') ? 'text-green-600 dark:text-green-400' : 'text-destructive'}`}>
             {usernameMsg === 'Username updated' ? 'Nombre actualizado' : usernameMsg}
