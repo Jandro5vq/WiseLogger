@@ -26,5 +26,9 @@ export const env = {
   get BACKUP_CRON() { return optional('BACKUP_CRON', '0 2 * * *') },
   get BACKUP_PATH() { return optional('BACKUP_PATH', '/data/backups') },
   get AUTO_CLOSE_CRON() { return optional('AUTO_CLOSE_CRON', '55 23 * * *') },
+  get PASSWORD_RESET_EXPIRY_HOURS() { return parseInt(optional('PASSWORD_RESET_EXPIRY_HOURS', '24'), 10) },
+  // Deleted users stay restorable for this many days, then the purge cron removes them for good
+  get USER_DELETE_RETENTION_DAYS() { return parseInt(optional('USER_DELETE_RETENTION_DAYS', '30'), 10) },
+  get USER_PURGE_CRON() { return optional('USER_PURGE_CRON', '30 3 * * *') },
   get NODE_ENV() { return optional('NODE_ENV', 'development') },
 } as const

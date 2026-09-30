@@ -20,7 +20,7 @@ function resolveUser(req: NextRequest) {
 
 async function createMcpResponse(req: NextRequest) {
   const user = resolveUser(req)
-  if (!user || !user.isActive) {
+  if (!user || !user.isActive || user.deletedAt) {
     return new NextResponse(null, { status: 401 })
   }
 

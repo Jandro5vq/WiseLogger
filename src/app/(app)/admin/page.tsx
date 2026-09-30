@@ -1,12 +1,14 @@
 import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth/session'
 import Link from 'next/link'
+import { listOpenResetRequests } from '@/lib/db/queries/password-resets'
 
 export const dynamic = 'force-dynamic'
 
 export default async function AdminPage() {
   const session = await getSession()
   if (!session || session.user.role !== 'admin') redirect('/dashboard')
+  const pendingResets = listOpenResetRequests().length
 
   return (
     <div className="max-w-2xl mx-auto space-y-6">
@@ -20,6 +22,11 @@ export default async function AdminPage() {
           <div className="text-2xl mb-2">👤</div>
           <h2 className="font-semibold">Users</h2>
           <p className="text-sm text-muted-foreground mt-1">Manage accounts and access</p>
+          {pendingResets > 0 && (
+            <p className="mt-2 inline-block text-xs px-2 py-0.5 rounded-full bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200">
+              {pendingResets === 1 ? '1 solicitud de contraseña' : `${pendingResets} solicitudes de contraseña`}
+            </p>
+          )}
         </Link>
 
         <Link
