@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeftBox } from 'pixelarticons/react'
+import { Dialog } from '@/components/ui/dialog'
 
 interface UserRow {
   id: string
@@ -16,6 +17,7 @@ interface UserRow {
 }
 
 interface ResetLink {
+  username: string
   url: string
   expiresAt: string
 }
@@ -31,8 +33,11 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<UserRow[]>([])
   const [meId, setMeId] = useState<string | null>(null)
   const [pendingResets, setPendingResets] = useState<Record<string, string>>({})
-  const [resetLinks, setResetLinks] = useState<Record<string, ResetLink>>({})
-  const [copied, setCopied] = useState<string | null>(null)
+  const [resetLink, setResetLink] = useState<ResetLink | null>(null)
+  const [copied, setCopied] = useState(false)
+  const [deleteTarget, setDeleteTarget] = useState<UserRow | null>(null)
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const [onboardingResetMsg, setOnboardingResetMsg] = useState<Record<string, string>>({})
   const [rowError, setRowError] = useState<Record<string, string>>({})
   const [editing, setEditing] = useState<{ id: string; username: string; email: string } | null>(null)
@@ -108,39 +113,48 @@ export default function AdminUsersPage() {
     }
   }
 
-  async function generateResetLink(id: string) {
-    const res = await fetch(`/api/admin/users/${id}/reset-link`, { method: 'POST' })
-    const data = await res.json()
-    if (!res.ok) {
-      setError(id, data.error ?? 'Error')
-      return
-    }
-    setResetLinks((prev) => ({ ...prev, [id]: data }))
-    setPendingResets((prev) => {
-      const next = { ...prev }
-      delete next[id]
-      return next
-    })
-  }
-
-  async function copyLink(id: string, url: string) {
-    try {
-      await navigator.clipboard.writeText(url)
-      setCopied(id)
-      setTimeout(() => setCopied((c) => (c === id ? null : c)), 2000)
-    } catch {
-      // Clipboard unavailable (e.g. plain http): the link stays selectable
-    }
-  }
-
-  async function deleteUser(user: UserRow) {
-    if (!confirm(`¿Eliminar a ${user.username}? No podrá iniciar sesión. Podrás restaurarlo durante 30 días; después se borrará definitivamente con todos sus datos.`)) return
-    const res = await fetch(`/api/admin/users/${user.id}`, { method: 'DELETE' })
+  async function generateResetLink(user: UserRow) {
+    const res = await fetch(`/api/admin/users/${user.id}/reset-link`, { method: 'POST' })
     const data = await res.json()
     if (!res.ok) {
       setError(user.id, data.error ?? 'Error')
       return
     }
+    setCopied(false)
+    setResetLink({ username: user.username, url: data.url, expiresAt: data.expiresAt })
+    setPendingResets((prev) => {
+      const next = { ...prev }
+      delete next[user.id]
+      return next
+    })
+  }
+
+  async function copyLink(url: string) {
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch {
+      // Clipboard unavailable (e.g. plain http): the link stays selectable
+    }
+  }
+
+  function askDelete(user: UserRow) {
+    setDeleteError('')
+    setDeleteTarget(user)
+  }
+
+  async function confirmDelete() {
+    if (!deleteTarget) return
+    setDeleting(true)
+    const res = await fetch(`/api/admin/users/${deleteTarget.id}`, { method: 'DELETE' })
+    const data = await res.json()
+    setDeleting(false)
+    if (!res.ok) {
+      setDeleteError(data.error ?? 'Error')
+      return
+    }
+    setDeleteTarget(null)
     loadUsers()
   }
 
@@ -175,7 +189,7 @@ export default function AdminUsersPage() {
         </p>
       )}
 
-      <div className="rounded-lg border border-border bg-card overflow-hidden">
+      <div className="rounded-lg border border-border bg-card overflow-x-auto">
         <table className="w-full text-sm">
           <thead className="bg-muted/50">
             <tr>
@@ -261,7 +275,7 @@ export default function AdminUsersPage() {
                       {user.isActive ? 'Suspend' : 'Activate'}
                     </button>
                     <button
-                      onClick={() => generateResetLink(user.id)}
+                      onClick={() => generateResetLink(user)}
                       className="text-xs underline text-muted-foreground hover:text-foreground"
                     >
                       Reset link
@@ -279,31 +293,13 @@ export default function AdminUsersPage() {
                     )}
                     {user.id !== meId && (
                       <button
-                        onClick={() => deleteUser(user)}
+                        onClick={() => askDelete(user)}
                         className="text-xs underline text-destructive hover:opacity-80"
                       >
                         Delete
                       </button>
                     )}
                   </div>
-                  {resetLinks[user.id] && (
-                    <div className="mt-2 space-y-1">
-                      <div className="flex items-center gap-2">
-                        <code className="min-w-0 flex-1 truncate text-xs bg-muted px-1.5 py-0.5 rounded select-all" title={resetLinks[user.id].url}>
-                          {resetLinks[user.id].url}
-                        </code>
-                        <button
-                          onClick={() => copyLink(user.id, resetLinks[user.id].url)}
-                          className="shrink-0 text-xs underline text-muted-foreground hover:text-foreground"
-                        >
-                          {copied === user.id ? 'Copied' : 'Copy'}
-                        </button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Un solo uso · caduca el {formatDateTime(resetLinks[user.id].expiresAt)}
-                      </p>
-                    </div>
-                  )}
                   {rowError[user.id] && <p className="mt-1 text-xs text-destructive">{rowError[user.id]}</p>}
                 </td>
               </tr>
@@ -351,6 +347,64 @@ export default function AdminUsersPage() {
           </div>
         </section>
       )}
+
+      <Dialog open={!!resetLink} onClose={() => setResetLink(null)} title="Enlace para restablecer contraseña">
+        {resetLink && (
+          <div className="space-y-3">
+            <p className="text-sm text-muted-foreground">
+              Pásale este enlace a <strong className="text-foreground">{resetLink.username}</strong>. Sirve una sola vez
+              y caduca el {formatDateTime(resetLink.expiresAt)}. No se podrá volver a ver: si se pierde, genera otro.
+            </p>
+            <code className="block break-all rounded-md bg-muted px-3 py-2 text-xs select-all">{resetLink.url}</code>
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setResetLink(null)}
+                className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent"
+              >
+                Cerrar
+              </button>
+              <button
+                onClick={() => copyLink(resetLink.url)}
+                className="rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                {copied ? 'Copiado' : 'Copiar enlace'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Dialog>
+
+      <Dialog open={!!deleteTarget} onClose={() => !deleting && setDeleteTarget(null)} title="Eliminar usuario">
+        {deleteTarget && (
+          <div className="space-y-3">
+            <p className="text-sm">
+              ¿Eliminar a <strong>{deleteTarget.username}</strong> <span className="text-muted-foreground">({deleteTarget.email})</span>?
+            </p>
+            <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
+              <li>No podrá iniciar sesión y se cerrarán sus sesiones abiertas.</li>
+              <li>Podrás restaurarlo desde «Eliminados» durante 30 días.</li>
+              <li>Pasado ese plazo se borrará definitivamente con todos sus datos.</li>
+            </ul>
+            {deleteError && <p className="text-sm text-destructive">{deleteError}</p>}
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={() => setDeleteTarget(null)}
+                disabled={deleting}
+                className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={confirmDelete}
+                disabled={deleting}
+                className="rounded-md bg-destructive px-3 py-1.5 text-sm font-medium text-destructive-foreground hover:bg-destructive/90 disabled:opacity-50"
+              >
+                {deleting ? 'Eliminando…' : 'Eliminar'}
+              </button>
+            </div>
+          </div>
+        )}
+      </Dialog>
     </div>
   )
 }
