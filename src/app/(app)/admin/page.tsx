@@ -46,6 +46,15 @@ export default async function AdminPage() {
           <h2 className="font-semibold">Actividad</h2>
           <p className="text-sm text-muted-foreground mt-1">Uso general de la aplicación</p>
         </Link>
+
+        <Link
+          href="/admin/appearance"
+          className="rounded-lg border border-border bg-card p-6 hover:bg-accent transition-colors"
+        >
+          <div className="text-2xl mb-2">🎃</div>
+          <h2 className="font-semibold">Apariencia estacional</h2>
+          <p className="text-sm text-muted-foreground mt-1">Detalles de Navidad y otras temporadas</p>
+        </Link>
       </div>
     </div>
   )

@@ -102,3 +102,67 @@
 .tour-spotlight {
   animation: tour-pulse 2s ease-in-out infinite;
 }
+
+/* Decorations animate only under the pointer, never continuously in the app shell. */
+.seasonal-decoration {
+  --seasonal-float-distance: -1.5px;
+  --seasonal-sway-angle: 2deg;
+  --seasonal-glow-opacity: .4;
+  --seasonal-brightness: 1.3;
+}
+.seasonal-decoration[data-seasonal-placement="header"] {
+  --seasonal-float-distance: -3px;
+  --seasonal-sway-angle: 5deg;
+  --seasonal-glow-opacity: .65;
+  --seasonal-brightness: 1.6;
+}
+@media (hover: hover) and (prefers-reduced-motion: no-preference) {
+  .seasonal-decoration:hover .seasonal-twinkle {
+    animation: seasonal-twinkle 2.8s ease-in-out infinite;
+  }
+  .seasonal-decoration:hover .seasonal-glow {
+    animation: seasonal-glow 2.8s ease-in-out infinite;
+  }
+  .seasonal-decoration:hover .seasonal-float {
+    animation: seasonal-float 3s ease-in-out infinite;
+  }
+  .seasonal-decoration:hover .seasonal-sway {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: seasonal-sway 3.5s ease-in-out infinite;
+  }
+  .seasonal-decoration:hover .seasonal-spin {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: seasonal-spin 12s linear infinite;
+  }
+  .seasonal-decoration:hover .seasonal-flap {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: seasonal-flap .45s ease-in-out infinite;
+  }
+}
+
+@keyframes seasonal-twinkle {
+  0%, 100% { opacity: 1; filter: brightness(1); }
+  50% { opacity: .75; filter: brightness(var(--seasonal-brightness)); }
+}
+@keyframes seasonal-glow {
+  0%, 100% { opacity: .18; }
+  50% { opacity: var(--seasonal-glow-opacity); }
+}
+@keyframes seasonal-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes seasonal-flap {
+  0%, 100% { transform: scaleX(1); }
+  50% { transform: scaleX(.35); }
+}
+@keyframes seasonal-float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(var(--seasonal-float-distance)); }
+}
+@keyframes seasonal-sway {
+  0%, 100% { transform: rotate(calc(-1 * var(--seasonal-sway-angle))); }
+  50% { transform: rotate(var(--seasonal-sway-angle)); }
+}

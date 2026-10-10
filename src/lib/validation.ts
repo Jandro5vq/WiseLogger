@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { MANUAL_SEASONAL_THEMES, SEASONAL_THEME_MODES } from '@/lib/seasonal-theme'
 
 // Shared request schemas. Zod objects strip unknown keys by default, so PATCH
 // bodies can't smuggle columns like `id` or `userId` into a DB update.
@@ -35,3 +36,21 @@ export const AdminUserPatchSchema = z
     email: z.string().optional(),
   })
   .refine((b) => Object.values(b).some((v) => v !== undefined), 'No hay cambios que aplicar')
+
+export const SeasonalThemeSettingsSchema = z
+  .object({
+    seasonalThemeMode: z.enum(SEASONAL_THEME_MODES),
+    manualSeasonalTheme: z.enum(MANUAL_SEASONAL_THEMES).nullable().optional(),
+    manualSeasonalThemeUntil: z.string().datetime().nullable().optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.seasonalThemeMode !== 'manual') return
+    if (!value.manualSeasonalTheme) {
+      ctx.addIssue({ code: 'custom', message: 'Selecciona una decoración manual', path: ['manualSeasonalTheme'] })
+    }
+    if (!value.manualSeasonalThemeUntil) {
+      ctx.addIssue({ code: 'custom', message: 'Indica cuándo termina la decoración manual', path: ['manualSeasonalThemeUntil'] })
+    } else if (new Date(value.manualSeasonalThemeUntil).getTime() <= Date.now()) {
+      ctx.addIssue({ code: 'custom', message: 'La decoración manual debe terminar en el futuro', path: ['manualSeasonalThemeUntil'] })
+    }
+  })

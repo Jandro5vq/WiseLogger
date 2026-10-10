@@ -143,3 +143,11 @@ export const passwordResetTokens = sqliteTable('password_reset_tokens', {
   expiresAt: text('expires_at').notNull(),
   usedAt: text('used_at'), // also set when the token is superseded or revoked
 })
+// Single row (id = 1): instance-wide preferences managed by an administrator.
+export const instanceSettings = sqliteTable('instance_settings', {
+  id: integer('id').primaryKey(),
+  seasonalThemeMode: text('seasonal_theme_mode', { enum: ['disabled', 'automatic', 'manual'] }).notNull().default('automatic'),
+  manualSeasonalTheme: text('manual_seasonal_theme', { enum: ['halloween', 'winter', 'spring', 'summer'] }),
+  manualSeasonalThemeUntil: text('manual_seasonal_theme_until'),
+  updatedAt: text('updated_at').notNull(),
+})
