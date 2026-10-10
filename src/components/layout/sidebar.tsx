@@ -5,6 +5,8 @@ import { usePathname } from 'next/navigation'
 import { cn } from '@/lib/utils'
 import { APP_VERSION } from '@/lib/version'
 import { Clock, Calendar, ChartBarBig, Settings2, User, Logout } from 'pixelarticons/react'
+import { SeasonalDecoration } from '@/components/layout/seasonal-decoration'
+import type { ActiveSeasonalTheme } from '@/lib/seasonal-theme'
 
 const navItems = [
   { href: '/dashboard', label: 'Hoy', Icon: Clock, color: 'text-sky-400' },
@@ -13,7 +15,7 @@ const navItems = [
   { href: '/settings', label: 'Ajustes', Icon: Settings2, color: 'text-amber-400' },
 ]
 
-export function Sidebar({ isAdmin }: { isAdmin: boolean }) {
+export function Sidebar({ isAdmin, seasonalTheme }: { isAdmin: boolean; seasonalTheme: ActiveSeasonalTheme }) {
   const pathname = usePathname()
 
   async function handleLogout() {
@@ -23,7 +25,7 @@ export function Sidebar({ isAdmin }: { isAdmin: boolean }) {
   }
 
   return (
-    <aside className="flex flex-col h-full w-56 bg-card border-r border-border px-3 py-4">
+    <aside className="relative flex flex-col h-full w-56 bg-card border-r border-border px-3 py-4">
       <div className="mb-6 px-2">
         <span className="text-xl font-bold text-primary">WiseLogger</span>
       </div>
@@ -75,9 +77,12 @@ export function Sidebar({ isAdmin }: { isAdmin: boolean }) {
         Cerrar sesión
       </button>
 
-      <span className="mt-2 px-3 text-xs text-muted-foreground tabular-nums" title="Versión de WiseLogger (tag de main)">
-        {APP_VERSION}
-      </span>
+      <div className="mt-2 flex items-end justify-between gap-1 px-3">
+        <span className="min-w-0 break-all text-xs text-muted-foreground tabular-nums" title="Versión de WiseLogger (tag de main)">
+          {APP_VERSION}
+        </span>
+        <SeasonalDecoration theme={seasonalTheme} placement="sidebar" />
+      </div>
     </aside>
   )
 }
