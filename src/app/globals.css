@@ -126,11 +126,20 @@
   .seasonal-decoration:hover .seasonal-float {
     animation: seasonal-float 3s ease-in-out infinite;
   }
-  .seasonal-decoration:hover .seasonal-sway,
-  .seasonal-decoration:hover .seasonal-sun {
+  .seasonal-decoration:hover .seasonal-sway {
     transform-box: fill-box;
     transform-origin: center;
     animation: seasonal-sway 3.5s ease-in-out infinite;
+  }
+  .seasonal-decoration:hover .seasonal-spin {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: seasonal-spin 12s linear infinite;
+  }
+  .seasonal-decoration:hover .seasonal-flap {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: seasonal-flap .45s ease-in-out infinite;
   }
 }
 
@@ -139,8 +148,15 @@
   50% { opacity: .75; filter: brightness(var(--seasonal-brightness)); }
 }
 @keyframes seasonal-glow {
-  0%, 100% { opacity: .12; }
+  0%, 100% { opacity: .18; }
   50% { opacity: var(--seasonal-glow-opacity); }
+}
+@keyframes seasonal-spin {
+  to { transform: rotate(360deg); }
+}
+@keyframes seasonal-flap {
+  0%, 100% { transform: scaleX(1); }
+  50% { transform: scaleX(.35); }
 }
 @keyframes seasonal-float {
   0%, 100% { transform: translateY(0); }
