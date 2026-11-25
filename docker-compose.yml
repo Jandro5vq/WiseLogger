@@ -25,6 +25,9 @@ services:
       - PASSWORD_RESET_EXPIRY_HOURS=${PASSWORD_RESET_EXPIRY_HOURS:-24}
       - USER_DELETE_RETENTION_DAYS=${USER_DELETE_RETENTION_DAYS:-30}
       - USER_PURGE_CRON=${USER_PURGE_CRON:-30 3 * * *}
+      # Email via Resend; leave empty to hand links over manually
+      - RESEND_API_KEY=${RESEND_API_KEY:-}
+      - EMAIL_FROM=${EMAIL_FROM:-}
     restart: unless-stopped
     deploy:
       resources:
