@@ -20,6 +20,7 @@ interface ResetLink {
   username: string
   url: string
   expiresAt: string
+  emailSent: boolean
 }
 
 const DAY_MS = 24 * 60 * 60 * 1000
@@ -121,7 +122,7 @@ export default function AdminUsersPage() {
       return
     }
     setCopied(false)
-    setResetLink({ username: user.username, url: data.url, expiresAt: data.expiresAt })
+    setResetLink({ username: user.username, url: data.url, expiresAt: data.expiresAt, emailSent: data.emailSent === true })
     setPendingResets((prev) => {
       const next = { ...prev }
       delete next[user.id]
@@ -351,10 +352,17 @@ export default function AdminUsersPage() {
       <Dialog open={!!resetLink} onClose={() => setResetLink(null)} title="Enlace para restablecer contraseña">
         {resetLink && (
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">
-              Pásale este enlace a <strong className="text-foreground">{resetLink.username}</strong>. Sirve una sola vez
-              y caduca el {formatDateTime(resetLink.expiresAt)}. No se podrá volver a ver: si se pierde, genera otro.
-            </p>
+            {resetLink.emailSent ? (
+              <p className="text-sm text-muted-foreground">
+                Hemos enviado el enlace por email a <strong className="text-foreground">{resetLink.username}</strong>.
+                Sirve una sola vez y caduca el {formatDateTime(resetLink.expiresAt)}. Si no le llega, cópialo y pásaselo tú.
+              </p>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Pásale este enlace a <strong className="text-foreground">{resetLink.username}</strong>. Sirve una sola vez
+                y caduca el {formatDateTime(resetLink.expiresAt)}. No se podrá volver a ver: si se pierde, genera otro.
+              </p>
+            )}
             <code className="block break-all rounded-md bg-muted px-3 py-2 text-xs select-all">{resetLink.url}</code>
             <div className="flex justify-end gap-2">
               <button

@@ -5,8 +5,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireAdmin } from '@/lib/auth/session'
 import { getUserById } from '@/lib/db/queries/users'
 import { issueResetLink } from '@/lib/business/password-reset'
+import { isEmailEnabled } from '@/lib/email/send'
+import { sendPasswordResetEmail } from '@/lib/email/notifications'
 
-/** Issues a single-use password reset link for the user; the admin passes it on. */
+/** Issues a single-use password reset link; it is emailed when email is configured, and returned either way. */
 export async function POST(_req: NextRequest, { params }: { params: { id: string } }) {
   let session
   try {
@@ -18,5 +20,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   const user = getUserById(params.id)
   if (!user || user.deletedAt) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
-  return NextResponse.json(issueResetLink(user.id, session.user.id))
+  const link = issueResetLink(user.id, session.user.id)
+  const emailSent = isEmailEnabled() ? (await sendPasswordResetEmail(user, link)).ok : false
+  return NextResponse.json({ ...link, emailSent })
 }
