@@ -7,6 +7,8 @@ import crypto from 'crypto'
 import { requireAdmin } from '@/lib/auth/session'
 import { listInvitations, createInvitation } from '@/lib/db/queries/invitations'
 import { env } from '@/lib/env'
+import { isEmailEnabled } from '@/lib/email/send'
+import { sendInvitationEmail } from '@/lib/email/notifications'
 
 export async function GET() {
   try {
@@ -41,6 +43,13 @@ export async function POST(req: NextRequest) {
     expiresAt,
   })
 
-  const registrationUrl = `${env.BASE_URL}/register?token=${token}`
-  return NextResponse.json({ ...invitation, registrationUrl }, { status: 201 })
+  const registrationUrl = `${env.BASE_URL.replace(/\/+$/, '')}/register?token=${token}`
+  let emailSent = false
+  if (typeof email === 'string' && email.trim() && isEmailEnabled()) {
+    // The invitee has no account (and no timezone) yet: show the expiry in the admin's zone
+    emailSent = (
+      await sendInvitationEmail(email.trim(), { url: registrationUrl, expiresAt, timezone: session.user.timezone ?? 'UTC' })
+    ).ok
+  }
+  return NextResponse.json({ ...invitation, registrationUrl, emailSent }, { status: 201 })
 }

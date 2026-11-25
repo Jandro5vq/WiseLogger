@@ -30,5 +30,8 @@ export const env = {
   // Deleted users stay restorable for this many days, then the purge cron removes them for good
   get USER_DELETE_RETENTION_DAYS() { return parseInt(optional('USER_DELETE_RETENTION_DAYS', '30'), 10) },
   get USER_PURGE_CRON() { return optional('USER_PURGE_CRON', '30 3 * * *') },
+  // Email via Resend: both must be set, otherwise links are handed over manually as before
+  get RESEND_API_KEY() { return get('RESEND_API_KEY') },
+  get EMAIL_FROM() { return get('EMAIL_FROM') },
   get NODE_ENV() { return optional('NODE_ENV', 'development') },
 } as const

@@ -5,6 +5,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/lib/auth/session'
 import { getUserById, updateUser } from '@/lib/db/queries/users'
 import { verifyPassword, hashPassword, validatePassword } from '@/lib/auth/password'
+import { sendPasswordChangedEmail } from '@/lib/email/notifications'
 
 export async function POST(req: NextRequest) {
   const session = await getSession(req)
@@ -27,7 +28,9 @@ export async function POST(req: NextRequest) {
   if (!valid) return NextResponse.json({ error: 'Current password is incorrect' }, { status: 401 })
 
   const passwordHash = await hashPassword(newPassword)
-  updateUser(session.user.id, { passwordHash, validSince: new Date().toISOString() })
+  const now = new Date().toISOString()
+  updateUser(session.user.id, { passwordHash, validSince: now })
+  void sendPasswordChangedEmail(user, now)
 
   return NextResponse.json({ ok: true })
 }

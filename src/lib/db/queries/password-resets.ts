@@ -1,6 +1,6 @@
 import { db } from '@/lib/db'
 import { passwordResetRequests, passwordResetTokens, users } from '@db/schema'
-import { and, eq, isNull } from 'drizzle-orm'
+import { and, desc, eq, isNull } from 'drizzle-orm'
 
 export function getOpenResetRequest(userId: string) {
   return db
@@ -40,11 +40,22 @@ export function createResetToken(data: {
   id: string
   userId: string
   tokenHash: string
-  createdBy: string
+  createdBy: string | null // null: self-service, requested from the login screen
   createdAt: string
   expiresAt: string
 }) {
   return db.insert(passwordResetTokens).values(data).returning().get()
+}
+
+/** The user's most recently issued token, used or not. */
+export function getLatestResetToken(userId: string) {
+  return db
+    .select()
+    .from(passwordResetTokens)
+    .where(eq(passwordResetTokens.userId, userId))
+    .orderBy(desc(passwordResetTokens.createdAt))
+    .limit(1)
+    .get()
 }
 
 export function getResetTokenByHash(tokenHash: string) {

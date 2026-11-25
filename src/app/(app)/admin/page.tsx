@@ -2,6 +2,9 @@ import { redirect } from 'next/navigation'
 import { getSession } from '@/lib/auth/session'
 import Link from 'next/link'
 import { listOpenResetRequests } from '@/lib/db/queries/password-resets'
+import { isEmailEnabled } from '@/lib/email/send'
+import { env } from '@/lib/env'
+import { EmailCard } from './email-card'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,6 +58,8 @@ export default async function AdminPage() {
           <h2 className="font-semibold">Apariencia estacional</h2>
           <p className="text-sm text-muted-foreground mt-1">Detalles de Navidad y otras temporadas</p>
         </Link>
+
+        <EmailCard enabled={isEmailEnabled()} from={env.EMAIL_FROM} />
       </div>
     </div>
   )

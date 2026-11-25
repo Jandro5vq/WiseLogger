@@ -12,6 +12,7 @@ interface Invitation {
   expiresAt: string
   usedAt: string | null
   registrationUrl?: string
+  emailSent?: boolean
 }
 
 export default function AdminInvitationsPage() {
@@ -88,7 +89,13 @@ export default function AdminInvitationsPage() {
 
       {newInvite?.registrationUrl && (
         <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 mb-4">
-          <p className="text-sm font-medium mb-2">New invitation link:</p>
+          {newInvite.emailSent ? (
+            <p className="text-sm font-medium mb-2">
+              Invitación enviada por email a <strong>{newInvite.email}</strong>. También puedes copiar el enlace:
+            </p>
+          ) : (
+            <p className="text-sm font-medium mb-2">New invitation link:</p>
+          )}
           <div className="flex items-center gap-2">
             <code className="flex-1 text-xs bg-background rounded px-2 py-1 break-all">
               {newInvite.registrationUrl}
